@@ -1,6 +1,6 @@
 from plotly import graph_objects as go
 import pycolmap
-from plycam.axes import render_axes as _render_axes
+from mts.viz.d3.plotly.axes import render_axes as _render_axes
 
 
 def render_axes(

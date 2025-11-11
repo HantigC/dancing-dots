@@ -1,6 +1,6 @@
 import numpy as np
 from plotly import graph_objects as go
-from .core import create_new_figure
+from .figure import create_new_figure
 
 
 @create_new_figure

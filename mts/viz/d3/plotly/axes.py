@@ -1,8 +1,10 @@
-import numpy as np
-from plotly import graph_objects as go
 import itertools as it
 
-from .utils.dict import extract_kwargs
+import numpy as np
+from plotly import graph_objects as go
+
+from mts.utils.dict import extract_kwargs
+
 
 
 def render_axes(
