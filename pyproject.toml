@@ -6,11 +6,13 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "h5py>=3.15.1",
+    "hloc",
     "matplotlib>=3.10.7",
     "numpy>=2.3.4",
     "pandas>=2.3.3",
     "plotly>=6.4.0",
     "pycolmap>=3.13.0",
+    "torch>=2.9.0",
     "tqdm>=4.67.1",
 ]
 
@@ -18,3 +20,6 @@ dependencies = [
 dev = [
     "ipykernel>=7.1.0",
 ]
+
+[tool.uv.sources]
+hloc = { git = "https://github.com/cvg/Hierarchical-Localization.git" }
