@@ -27,8 +27,6 @@ class NetVladEmbedding(
         descriptor_dict = self.net_vlad(data_dict)
 
         global_descriptor = descriptor_dict["global_descriptor"].squeeze()
-        del img_t
-        gc.collect()
         return global_descriptor
 
     def to(self, device, **kwargs):
