@@ -20,7 +20,7 @@ class BaseEmbedder(ABC, Generic[T, K]):
 def extract_embeddings(
     embedder: BaseEmbedder,
     image_filepaths: list[Path | str],
-) -> torch.Tensor | np.ndarray:
+) -> np.ndarray:
     embeddings = []
     with torch.no_grad():
         for image_filepath in tqdm(image_filepaths):

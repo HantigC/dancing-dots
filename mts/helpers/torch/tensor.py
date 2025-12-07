@@ -1,6 +1,7 @@
+import numpy as np
 import torch
 
-from .types import TensorCollectionType
+from .types import NPArrayCollectionType, TensorCollectionType
 
 
 def to(
@@ -20,3 +21,34 @@ def to(
     elif isinstance(tensor_collection, tuple):
         return tuple(to(value, dtype, device) for value in tensor_collection)
     raise ValueError(f"`{tensor_collection.__class__.__name__}` not supported")
+
+
+def to_2d(
+    tensor: torch.Tensor | list[torch.Tensor],
+) -> torch.Tensor:
+    if isinstance(tensor, list | tuple):
+        if not isinstance(tensor[0], torch.Tensor):
+            raise ValueError("It should be a list of tensors or a 2d tensor")
+        tensor = torch.stack(tensor)
+    if tensor.ndim != 2:
+        raise ValueError(
+            f"it should be a list of 1d tensors or a 2d tensor, not {tensor.ndim}d"
+        )
+
+    return tensor
+
+
+def from_np(
+    arrays: NPArrayCollectionType,
+) -> TensorCollectionType:
+    if isinstance(arrays, np.ndarray):
+        return torch.from_numpy(arrays)
+    elif isinstance(arrays, torch.Tensor):
+        return arrays
+    elif isinstance(arrays, dict):
+        return {key: from_np(value) for key, value in arrays.items()}
+    elif isinstance(arrays, list):
+        return [from_np(value) for value in arrays]
+    elif isinstance(arrays, tuple):
+        return tuple(from_np(value) for value in arrays)
+    raise ValueError(f"`{arrays.__class__.__name__}` not supported")
