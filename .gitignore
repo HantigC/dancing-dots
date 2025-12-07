@@ -1,5 +1,7 @@
 # Project
 data/
+iterations/
+weights/
 
 # vscode
 .vscode/

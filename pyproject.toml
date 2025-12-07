@@ -7,6 +7,8 @@ requires-python = ">=3.11"
 dependencies = [
     "h5py>=3.15.1",
     "hloc",
+    "kornia>=0.8.2",
+    "lightglue>=0.0",
     "matplotlib>=3.10.7",
     "more-itertools>=10.8.0",
     "nbformat>=5.10.4",
@@ -17,6 +19,7 @@ dependencies = [
     "pycolmap>=3.13.0",
     "torch>=2.9.0",
     "tqdm>=4.67.1",
+    "transformers>=4.57.1",
 ]
 
 [dependency-groups]
