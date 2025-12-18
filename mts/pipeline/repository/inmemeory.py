@@ -23,6 +23,9 @@ class ImageRepository:
         self._pairs_map = {}
         self._pairs = []
 
+    def pair_num(self) -> int:
+        return len(self._pairs)
+
     def add_pairs(self, pairs: list[PairType[ImageId]]) -> None:
         for st_id, nd_id in pairs:
             self._pairs_map.setdefault(st_id, []).append(nd_id)

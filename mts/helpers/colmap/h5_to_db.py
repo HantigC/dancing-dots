@@ -23,6 +23,13 @@ from tqdm import tqdm
 from .database import COLMAPDatabase, image_ids_to_pair_id
 
 
+class CameraModel:
+    SIMPLE_PINHOLE = "simple-pinhole"
+    PINHOLE = "pinhole"
+    SIMPLE_RADIAL = "simple-radial"
+    OPENCV = "opencv"
+
+
 def get_focal(image_path, err_on_default=False):
     image         = Image.open(image_path)
     max_size      = max(image.size)
