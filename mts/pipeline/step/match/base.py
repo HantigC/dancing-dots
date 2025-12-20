@@ -5,7 +5,7 @@ from tqdm.auto import tqdm
 
 from mts.core.matcher.base import BaseMatcher
 from mts.pipeline.repository.inmemeory import ImageRepository
-from mts.pipeline.step.base import BasePipelineStep
+from mts.pipeline.step.base import BasePipelineStep, use_no_params
 
 LOGGER = logging.getLogger(__name__)
 
@@ -22,10 +22,9 @@ class MatchingStep(BasePipelineStep):
         self.matcher = matcher
         self.min_matches = min_matches
 
+    @use_no_params
     @torch.no_grad
-    def run(
-        self,
-    ) -> None:
+    def run(self) -> None:
         device = self.device
         with torch.inference_mode():
             for pair_idx in tqdm(self.image_repository.get_pairs()):

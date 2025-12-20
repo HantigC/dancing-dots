@@ -5,7 +5,7 @@ import tqdm
 
 from mts.core.embedder.base import BaseEmbedder
 from mts.pipeline.repository.inmemeory import ImageRepository
-from mts.pipeline.step.base import BasePipelineStep
+from mts.pipeline.step.base import BasePipelineStep, use_no_params
 from mts.utils.torchx import to_torch_format
 
 
@@ -43,7 +43,6 @@ class GlobalDescriptorStep(BasePipelineStep):
                     image_index, global_descriptor
                 )
 
-    def run(
-        self,
-    ) -> None:
+    @use_no_params
+    def run(self) -> None:
         self._extract(self.image_repository.image_ids())

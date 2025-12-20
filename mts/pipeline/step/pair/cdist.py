@@ -5,7 +5,7 @@ from typing import Sequence
 from mts.core.pair.cross import compute_cross_pairs
 from mts.core.types import ImageId, PairType
 from mts.pipeline.repository.inmemeory import ImageRepository
-from mts.pipeline.step.base import BasePipelineStep
+from mts.pipeline.step.base import BasePipelineStep, use_no_params
 
 LOGGER = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ class CrossEmbeddingParer(BasePipelineStep):
         self.distance_th = distance_th
         self.min_pairs = min_pairs
 
+    @use_no_params
     def run(self) -> None:
         LOGGER.info("Compute pairs...")
         pairs = self._compute_pairs(self.image_repository.image_ids())

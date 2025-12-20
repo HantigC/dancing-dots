@@ -5,7 +5,7 @@ from tqdm.auto import tqdm
 
 from mts.core.extractor.base import BaseExtractor
 from mts.pipeline.repository.inmemeory import ImageRepository
-from mts.pipeline.step.base import BasePipelineStep
+from mts.pipeline.step.base import BasePipelineStep, use_no_params
 from mts.utils.torchx import to_torch_format
 
 
@@ -38,7 +38,6 @@ class TorchExtractStep(BasePipelineStep):
                 self.repository.add_keypoints(image_index, keypoints)
                 self.repository.add_descriptors(image_index, descriptors)
 
-    def run(
-        self,
-    ) -> None:
+    @use_no_params
+    def run(self) -> None:
         self._extract(self.repository.image_ids())

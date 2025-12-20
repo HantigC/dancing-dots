@@ -8,7 +8,7 @@ from mts.core.types import PathLike
 from mts.helpers.colmap.database import COLMAPDatabase
 from mts.helpers.colmap.h5_to_db import CameraModel, create_camera
 from mts.pipeline.repository.inmemeory import ImageRepository
-from mts.pipeline.step.base import BasePipelineStep
+from mts.pipeline.step.base import BasePipelineStep, use_no_params
 
 
 class ColmapImportStep(BasePipelineStep):
@@ -25,7 +25,10 @@ class ColmapImportStep(BasePipelineStep):
         self.single_camera = single_camera
         self.camera_model = camera_model
 
-    def run(self) -> None:
+    @use_no_params
+    def run(
+        self,
+    ) -> None:
         self.db.create_tables()
         try:
             id_to_db_id = self._add_keypoints()
@@ -72,6 +75,13 @@ class ColmapImportStep(BasePipelineStep):
             id_to_db_id[image_id] = db_image_id
 
         return id_to_db_id
+
+    @classmethod
+    def from_db_filepath(
+        cls, db_filepath: PathLike, image_repository: ImageRepository, **kwargs
+    ) -> ColmapImportStep:
+        db = COLMAPDatabase(db_filepath)
+        return cls(db, image_repository, **kwargs)
 
     @classmethod
     def from_directory(
