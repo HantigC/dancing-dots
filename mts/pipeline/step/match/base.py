@@ -5,7 +5,7 @@ from tqdm.auto import tqdm
 
 from mts.core.matcher.base import BaseMatcher
 from mts.pipeline.repository.inmemeory import ImageRepository
-from mts.pipeline.step.base import BasePipelineStep, use_no_params
+from mts.pipeline.step.base import BasePipelineStep, use_image_repository
 
 LOGGER = logging.getLogger(__name__)
 
@@ -13,34 +13,32 @@ LOGGER = logging.getLogger(__name__)
 class MatchingStep(BasePipelineStep):
     def __init__(
         self,
-        image_repository: ImageRepository,
         matcher: BaseMatcher,
         min_matches: int = 50,
     ) -> None:
         super().__init__()
-        self.image_repository = image_repository
         self.matcher = matcher
         self.min_matches = min_matches
 
-    @use_no_params
+    @use_image_repository
     @torch.no_grad
-    def run(self) -> None:
+    def run(self, image_repository: ImageRepository) -> None:
         device = self.device
         with torch.inference_mode():
-            for pair_idx in tqdm(self.image_repository.get_pairs()):
+            for pair_idx in tqdm(image_repository.get_pairs()):
                 idx1, idx2 = pair_idx
 
                 kps1 = torch.from_numpy(
-                    self.image_repository.get_keypoints(idx1),
+                    image_repository.get_keypoints(idx1),
                 ).to(device)
                 kps2 = torch.from_numpy(
-                    self.image_repository.get_keypoints(idx2),
+                    image_repository.get_keypoints(idx2),
                 ).to(device)
                 desc1 = torch.from_numpy(
-                    self.image_repository.get_descriptors(idx1),
+                    image_repository.get_descriptors(idx1),
                 ).to(device)
                 desc2 = torch.from_numpy(
-                    self.image_repository.get_descriptors(idx2),
+                    image_repository.get_descriptors(idx2),
                 ).to(device)
 
                 dists, idxs = self.matcher.match(
@@ -57,7 +55,7 @@ class MatchingStep(BasePipelineStep):
                     LOGGER.info(
                         "Matched (%d, %d) having %d of matches", idx1, idx2, len(idxs)
                     )
-                    self.image_repository.add_matches(
+                    image_repository.add_matches(
                         idx1,
                         idx2,
                         idxs.detach().cpu().numpy().reshape(-1, 2),

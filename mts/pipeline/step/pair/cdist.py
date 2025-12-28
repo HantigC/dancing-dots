@@ -1,11 +1,10 @@
 import itertools as it
 import logging
-from typing import Sequence
 
 from mts.core.pair.cross import compute_cross_pairs
 from mts.core.types import ImageId, PairType
 from mts.pipeline.repository.inmemeory import ImageRepository
-from mts.pipeline.step.base import BasePipelineStep, use_no_params
+from mts.pipeline.step.base import BasePipelineStep, use_image_repository
 
 LOGGER = logging.getLogger(__name__)
 
@@ -25,19 +24,21 @@ class CrossEmbeddingParer(BasePipelineStep):
         self.distance_th = distance_th
         self.min_pairs = min_pairs
 
-    @use_no_params
-    def run(self) -> None:
+    @use_image_repository
+    def run(self, image_repository: ImageRepository) -> None:
         LOGGER.info("Compute pairs...")
-        pairs = self._compute_pairs(self.image_repository.image_ids())
+        pairs = self._compute_pairs(image_repository)
         LOGGER.info("Computed %d pairs...", len(pairs))
-        self.image_repository.add_pairs(pairs)
+        image_repository.add_pairs(pairs)
 
-    def _compute_pairs(self, image_ids: Sequence[ImageId]) -> list[PairType[ImageId]]:
-        if self.image_repository.images_num() < self.min_images:
-            return list(it.combinations(image_ids, 2))
+    def _compute_pairs(
+        self, image_repository: ImageRepository
+    ) -> list[PairType[ImageId]]:
+        if image_repository.images_num() < self.min_images:
+            return list(it.combinations(image_repository.image_ids(), 2))
         image_embeddings = [
-            self.image_repository.get_global_descriptor(image_id)
-            for image_id in image_ids
+            image_repository.get_global_descriptor(image_id)
+            for image_id in image_repository.image_ids()
         ]
         pairs = compute_cross_pairs(
             image_embeddings,

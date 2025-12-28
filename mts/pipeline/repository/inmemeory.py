@@ -1,9 +1,14 @@
-from typing import Generator
-import cv2
+from typing import Any, Generator
+
 import numpy as np
 
+from mts.core.geometry.rigid3d import Rigid3D
 from mts.core.types import ImageId, PairType
 from mts.utils.image import imread_rgb
+
+class NotFoundException(BaseException):
+    """Raised in case an item is not found"""
+
 
 class ImageRepository:
     def __init__(self):
@@ -22,6 +27,9 @@ class ImageRepository:
         self._matches = {}
         self._pairs_map = {}
         self._pairs = []
+        self._poses: dict[ImageId, Rigid3D] = {}
+        self._metadata: dict[ImageId, dict[str, Any]] = {}
+        
 
     def pair_num(self) -> int:
         return len(self._pairs)
@@ -46,9 +54,6 @@ class ImageRepository:
     def load_image(self, image_id: int) -> np.ndarray:
         return imread_rgb(self._id_to_filepath[image_id])
 
-    # ---------------------------
-    # IMAGE FILEPATHS
-    # ---------------------------
     def add_image(self, filepath: str) -> int:
         """Add an image filepath and return its integer ID."""
         if filepath in self._images_filepath:
@@ -70,9 +75,36 @@ class ImageRepository:
 
     def images_num(self):
         return len(self._images_filepath)
-    # ---------------------------
-    # KEYPOINTS
-    # ---------------------------
+    
+    def add_metadata(self, image_id: ImageId, **kwargs):
+        image_metadata_dict = self._metadata.setdefault(image_id, {})
+        for k, v in kwargs.items():
+            if k in image_metadata_dict:
+                raise ValueError(f"metadata `{k}` already exists")
+            image_metadata_dict[k] = v
+
+    def update_metadata(self, image_id: ImageId, **kwargs):
+        image_metadata_dict = self._metadata.setdefault(image_id, {})
+        for k, v in kwargs.items():
+            if k not in image_metadata_dict:
+                raise ValueError(f"metadata `{k}` does not exist")
+            image_metadata_dict[k] = v
+
+    def upsert_metadata(self, image_id: ImageId, **kwargs):
+        image_metadata_dict = self._metadata.setdefault(image_id, {})
+        for k, v in kwargs.items():
+            image_metadata_dict[k] = v
+
+    def get_metadata(self, image_id: ImageId, *args):
+        image_metadata_dict = self._metadata.setdefault(image_id, {})
+        return {image_metadata_dict[k] for k in args}
+
+    def add_pose(self, image_id: ImageId, pose: Rigid3D):
+        self._poses[image_id] = pose
+
+    def get_pose(self, image_id: ImageId) -> Rigid3D:
+        return self._poses[image_id]
+
     def add_keypoints(self, img_id: int, keypoints: np.ndarray):
         self._keypoints[img_id] = keypoints
 
@@ -85,18 +117,12 @@ class ImageRepository:
     def get_global_descriptor(self, img_id: int) -> np.ndarray | None:
         return self._global_descriptors.get(img_id)
 
-    # ---------------------------
-    # DESCRIPTORS
-    # ---------------------------
     def add_descriptors(self, img_id: int, descriptors: np.ndarray):
         self._descriptors[img_id] = descriptors
 
     def get_descriptors(self, img_id: int) -> np.ndarray | None:
         return self._descriptors.get(img_id)
 
-    # ---------------------------
-    # MATCHES
-    # ---------------------------
     def add_matches(self, img_id1: int, img_id2: int, matches: np.ndarray):
         key = tuple(sorted((img_id1, img_id2)))
         self._matches[key] = matches

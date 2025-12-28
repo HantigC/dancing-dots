@@ -10,20 +10,23 @@ from mts.pipeline.repository.inmemeory import ImageRepository
 
 
 class BasePipelineStep(ABC, DeviceMixin, nn.Module):
-    def __init__(self) -> None:
-        self.image_repository = None
-
-    def set_image_repository(self, image_repository: ImageRepository) -> None:
-        self.image_repository = image_repository
-
     @abstractmethod
     def run(
         self,
         *,
+        image_repository: ImageRepository,
         input: Any,
         state: StateType,
     ) -> Any:
         pass
+
+
+def use_image_repository(
+    fn: Callable[..., Any] = None,
+    *,
+    params: list[str] | None = None,
+):
+    return use_params(fn, params=["image_repository"] + params)
 
 
 def use_no_params(fn: Callable[..., Any] = None):
@@ -31,7 +34,7 @@ def use_no_params(fn: Callable[..., Any] = None):
 
 
 class ParamsException(BaseException):
-    """"""
+    """Exception in case the parameters are not provided correctly"""
 
 
 def use_params(fn: Callable[..., Any] = None, *, params: list[str] | None = None):
@@ -57,10 +60,15 @@ def use_params(fn: Callable[..., Any] = None, *, params: list[str] | None = None
 def run_pipeline(
     steps: list[BasePipelineStep] | None = None,
     *,
+    image_repository: ImageRepository,
     input: Any | None = None,
     state: StateType | None = None,
 ) -> Any:
     state = {}
     for step in steps:
-        input = step.run(input=input, state=state)
+        input = step.run(
+            image_repository=image_repository,
+            input=input,
+            state=state,
+        )
     return input

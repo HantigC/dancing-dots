@@ -150,14 +150,14 @@ def blob_to_array(blob, dtype, shape=(-1,)):
         return np.frombuffer(blob, dtype=dtype).reshape(*shape)
 
 
-class COLMAPDatabase(sqlite3.Connection):
 
+class COLMAPDatabase(sqlite3.Connection):
     @staticmethod
     def connect(database_path):
         return sqlite3.connect(database_path, factory=COLMAPDatabase)
 
-    def __init__(self, *args, **kwargs):
-        super(COLMAPDatabase, self).__init__(*args, **kwargs)
+    def __init__(self, database, *args, **kwargs):
+        super(COLMAPDatabase, self).__init__(database, *args, **kwargs)
 
         self.create_tables = lambda: self.executescript(CREATE_ALL)
         self.create_cameras_table = \
@@ -173,6 +173,7 @@ class COLMAPDatabase(sqlite3.Connection):
         self.create_matches_table = \
             lambda: self.executescript(CREATE_MATCHES_TABLE)
         self.create_name_index = lambda: self.executescript(CREATE_NAME_INDEX)
+        self.database = database
 
     def add_camera(self, model, width, height, params,
                    prior_focal_length=False, camera_id=None):
