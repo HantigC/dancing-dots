@@ -30,7 +30,7 @@ class GlobalDescriptorStep(BasePipelineStep):
             ):
                 image = image_repository.load_image(image_index)
                 image = to_torch_format(image)
-                image = image.to(self.device)
+                image = image.to(self._run_on_device)
 
                 global_descriptor = self.global_extractor.embed_image(image)
                 global_descriptor = global_descriptor.detach().cpu().numpy()

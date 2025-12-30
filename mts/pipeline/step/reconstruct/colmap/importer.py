@@ -19,7 +19,9 @@ class ExportToColmapStep(BasePipelineStep):
         self.camera_model = camera_model
 
     @use_image_repository(params=["state"])
-    def run(self, image_repository: ImageRepository, state: StateType) -> COLMAPDatabase:
+    def run(
+        self, image_repository: ImageRepository, state: StateType
+    ) -> COLMAPDatabase:
         db = export_to_colmap(
             image_repository,
             state["colmap_db_filepath"],

@@ -6,12 +6,22 @@ from mts.core.geometry.rigid3d import Rigid3D
 from mts.core.types import ImageId, PairType
 from mts.utils.image import imread_rgb
 
-class NotFoundException(BaseException):
-    """Raised in case an item is not found"""
+
+class RepositoryException(BaseException):
+    """Repository related exception."""
+
+
+class NotFoundException(RepositoryException):
+    """Raised in case an item is not found inside the repository"""
+
+
+class AlreadyExistsException(RepositoryException):
+    """Raised in case an item already exists inside the repository"""
 
 
 class ImageRepository:
     def __init__(self):
+        self._repository_metadata = {}
         # filepath → integer ID
         self._images_filepath = {}
         # integer ID → filepath (reverse lookup)
@@ -29,7 +39,14 @@ class ImageRepository:
         self._pairs = []
         self._poses: dict[ImageId, Rigid3D] = {}
         self._metadata: dict[ImageId, dict[str, Any]] = {}
-        
+
+    def add_repository_metadata(self, **kwargs):
+        for k, v in kwargs.items():
+            if k in self._repository_metadata:
+                raise AlreadyExistsException(
+                    f"{k} already exists inside repository metadata"
+                )
+            self._repository_metadata[k] = v
 
     def pair_num(self) -> int:
         return len(self._pairs)
@@ -75,7 +92,7 @@ class ImageRepository:
 
     def images_num(self):
         return len(self._images_filepath)
-    
+
     def add_metadata(self, image_id: ImageId, **kwargs):
         image_metadata_dict = self._metadata.setdefault(image_id, {})
         for k, v in kwargs.items():
@@ -95,15 +112,19 @@ class ImageRepository:
         for k, v in kwargs.items():
             image_metadata_dict[k] = v
 
-    def get_metadata(self, image_id: ImageId, *args):
+    def get_metadata(self, image_id: ImageId):
+        image_metadata_dict = self._metadata.setdefault(image_id, {})
+        return image_metadata_dict
+
+    def get_metadata_values(self, image_id: ImageId, *args):
         image_metadata_dict = self._metadata.setdefault(image_id, {})
         return {image_metadata_dict[k] for k in args}
 
     def add_pose(self, image_id: ImageId, pose: Rigid3D):
         self._poses[image_id] = pose
 
-    def get_pose(self, image_id: ImageId) -> Rigid3D:
-        return self._poses[image_id]
+    def get_pose(self, image_id: ImageId) -> Rigid3D | None:
+        return self._poses.get(image_id)
 
     def add_keypoints(self, img_id: int, keypoints: np.ndarray):
         self._keypoints[img_id] = keypoints

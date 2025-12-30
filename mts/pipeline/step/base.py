@@ -21,11 +21,40 @@ class BasePipelineStep(ABC, DeviceMixin, nn.Module):
         pass
 
 
+class OnDeviceRunner(BasePipelineStep):
+    def __init__(
+        self,
+        step: BasePipelineStep,
+        device: str = "cpu",
+    ) -> None:
+        super().__init__()
+        self._run_on_device = device
+        self.step = step
+
+    def run(
+        self,
+        *,
+        image_repository: ImageRepository,
+        input: Any,
+        state: StateType,
+    ) -> Any:
+        prev_device = self.step.device
+        self.step.to(self._run_on_device)
+        result = self.step.run(
+            image_repository=image_repository,
+            input=input,
+            state=state,
+        )
+        self.step.to(prev_device)
+        return result
+
+
 def use_image_repository(
     fn: Callable[..., Any] = None,
     *,
     params: list[str] | None = None,
 ):
+    params = params or []
     return use_params(fn, params=["image_repository"] + params)
 
 

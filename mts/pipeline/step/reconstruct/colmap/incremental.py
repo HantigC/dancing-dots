@@ -7,8 +7,8 @@ from mts.pipeline.step.reconstruct.colmap.base import BaseColmapReconstructionSt
 
 
 class ColmapReconstructionStep(BaseColmapReconstructionStep):
-    def __init__(self, mapper_options: pycolmap.IncrementalMapperOptions) -> None:
-        super().__init__()
+    def __init__(self, mapper_options: pycolmap.IncrementalMapperOptions, **kwargs) -> None:
+        super().__init__(**kwargs)
         self.mapper_options = mapper_options
 
     @use_params(params=["state", "db"])

@@ -51,7 +51,7 @@ class IMC2025Pipeline:
         for dataset_name in datasets_names:
             self.run_for(dataset_name)
 
-    def run_for(self, dataset_name: str):
+    def run_for(self, dataset_name: str) -> None:
         dataset_samples = self.samples[dataset_name]
         image_repository = self._create_repository(dataset_name)
         pipeline = self._create_pipeline(dataset_name, image_repository)
@@ -62,6 +62,25 @@ class IMC2025Pipeline:
         LOGGER.info("Starting the pipeline for `{dataset_name}`")
         pipeline.run()
         LOGGER.info("Ending the pipeline for `{dataset_name}`")
+        self._collect()
+
+    def _collect(
+        self,
+        repository: ImageRepository,
+        dataset_samples: list[Prediction],
+    ) -> None:
+        filename_to_prediction = {
+            prediction.filename: prediction
+            for prediction in dataset_samples
+        }
+        for image_id in repository.image_ids():
+            metadata: dict[str, str] = repository.get_metadata(image_id)
+            cluster = metadata.get("cluster")
+            pose = repository.get_pose(image_id)
+            prediction = filename_to_prediction[repository.get_filepath(image_id)]
+            prediction.cluster_index = cluster
+            prediction.rotation = pose.rotation
+            prediction.translation = pose.translation
 
     @classmethod
     def from_samples_df(

@@ -28,7 +28,7 @@ class TorchExtractStep(BasePipelineStep):
             ):
                 image = self.repository.load_image(image_index)
                 image = to_torch_format(image)
-                image = image.to(self.device)
+                image = image.to(self._run_on_device)
                 keypoints, descriptors = self.extractor.extract(image)
 
                 keypoints = keypoints.detach().cpu().numpy()

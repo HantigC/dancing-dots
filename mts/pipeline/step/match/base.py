@@ -23,7 +23,7 @@ class MatchingStep(BasePipelineStep):
     @use_image_repository
     @torch.no_grad
     def run(self, image_repository: ImageRepository) -> None:
-        device = self.device
+        device = self._run_on_device
         with torch.inference_mode():
             for pair_idx in tqdm(image_repository.get_pairs()):
                 idx1, idx2 = pair_idx
