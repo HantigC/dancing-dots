@@ -93,7 +93,7 @@ def run_pipeline(
     input: Any | None = None,
     state: StateType | None = None,
 ) -> Any:
-    state = {}
+    state = state or {}
     for step in steps:
         input = step.run(
             image_repository=image_repository,
