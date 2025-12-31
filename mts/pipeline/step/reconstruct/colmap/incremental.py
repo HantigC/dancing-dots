@@ -19,7 +19,7 @@ class ColmapReconstructionStep(BaseColmapReconstructionStep):
     ) -> None:
         images_dirpath = Path(state["images_dir"])
         colmap_dirpath = Path(state["colmap_dirpath"])
-        pycolmap.match_exhaustive(self.database_path)
+        pycolmap.match_exhaustive(db.database)
         colmap_dirpath.mkdir(exist_ok=True)
         maps = pycolmap.incremental_mapping(
             database_path=db.database,

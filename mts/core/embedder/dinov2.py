@@ -24,7 +24,7 @@ class DinoV2GlobalDescriptors(
     @torch.no_grad
     def embed_image(self, image: np.ndarray) -> torch.Tensor:
         inputs = self.processor(images=image, return_tensors="pt", do_rescale=False)
-        inputs = inputs.to(self._run_on_device)
+        inputs = inputs.to(self.device)
         outputs = self.model(**inputs)
         outputs = F.normalize(
             outputs.last_hidden_state[:, 1:].max(dim=1)[0], dim=1, p=2

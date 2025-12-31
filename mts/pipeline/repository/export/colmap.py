@@ -59,6 +59,7 @@ def add_keypoints(
         keypoints = image_repository.get_keypoints(image_id)
         descriptors = image_repository.get_descriptors(image_id)
         image_filepath = image_repository.get_filepath(image_id)
+        # TODO: add more methods to to colmap-db: e.g. exists
 
         if camera_id is None or not single_camera:
             camera_id = create_camera(

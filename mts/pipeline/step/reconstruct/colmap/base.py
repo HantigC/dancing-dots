@@ -8,12 +8,22 @@ import pycolmap
 
 from mts.core.geometry.rigid3d import Rigid3D
 from mts.core.types import StateType
+from mts.helpers.colmap.h5_to_db import CameraModel
 from mts.pipeline.repository.export.colmap import export_to_colmap
 from mts.pipeline.repository.inmemeory import ImageRepository
 from mts.pipeline.step.base import BasePipelineStep, use_image_repository
 
 
 class BaseColmapReconstructionStep(BasePipelineStep, ABC):
+    def __init__(
+        self,
+        single_camera: bool = True,
+        camera_model: str = CameraModel.PINHOLE,
+    ) -> None:
+        super().__init__()
+        self.single_camera = single_camera
+        self.camera_model = camera_model
+
     @use_image_repository(params=["state"])
     def run(
         self,

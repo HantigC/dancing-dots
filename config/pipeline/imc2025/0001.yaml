@@ -23,10 +23,7 @@ pipeline:
           resize_to: 1024
 
     image_paring:
-        _target_: mts.pipeline.step.base.OnDeviceRunner
-        device: cuda:0
-        step:
-          _target_: mts.pipeline.step.pair.cdist.CrossEmbeddingParerStep
+        _target_: mts.pipeline.step.pair.cdist.CrossEmbeddingParerStep
 
     kp_matching: 
       _target_: mts.pipeline.step.base.OnDeviceRunner

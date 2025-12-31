@@ -1,9 +1,10 @@
+from pathlib import Path
 from typing import Any, Generator
 
 import numpy as np
 
 from mts.core.geometry.rigid3d import Rigid3D
-from mts.core.types import ImageId, PairType
+from mts.core.types import ImageId, PairType, PathLike
 from mts.utils.image import imread_rgb
 
 
@@ -82,9 +83,12 @@ class ImageRepository:
         self._next_id += 1
         return img_id
 
-    def get_image_id(self, filepath: str) -> int | None:
+    def get_image_id(self, filepath: PathLike) -> int | None:
         """Return the ID for a filepath, or None if not found."""
-        return self._images_filepath.get(filepath)
+        image_id = self._images_filepath.get(filepath)
+        if image_id is None:
+            image_id = self._images_filepath.get(Path(filepath))
+        return  image_id
 
     def get_filepath(self, img_id: int) -> str | None:
         """Return the filepath for a given image ID."""
