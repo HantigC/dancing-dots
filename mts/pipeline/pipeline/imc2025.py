@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
 from tqdm.auto import tqdm
 
-from mts.core.types import PathLike
+from mts.core.types import PathLike, StateType
 from mts.pipeline.repository.inmemeory import ImageRepository
+from mts.pipeline.step.base import run_pipeline
 from mts.pipeline.step.extract.kp.base import BasePipelineStep
 
 LOGGER = logging.getLogger(__name__)
@@ -36,6 +37,8 @@ class IMC2025Pipeline:
     samples: dict[str, list[Prediction]]
     create_repository: Callable[[str], ImageRepository]
     create_pipeline: Callable[[str, ImageRepository], BasePipelineStep]
+    create_pipeline_input: Callable[[IMC2025Pipeline, ImageRepository, str], Any] | None = field(default=None)
+    create_pipeline_state: Callable[[IMC2025Pipeline, ImageRepository, str], StateType] | None = field(default=None)
 
     def _get_dataset_names(self, datasets_names: list[str] | str = ALL) -> list[str]:
         if isinstance(datasets_names, str) and datasets_names == ALL:
@@ -46,23 +49,41 @@ class IMC2025Pipeline:
             )
         return datasets_names
 
-    def run(self, datasets_names: list[str] | str = ALL):
+    def run(
+        self,
+        datasets_names: list[str] | str = ALL,
+    ):
         datasets_names = self._get_dataset_names(datasets_names)
         for dataset_name in datasets_names:
             self.run_for(dataset_name)
 
     def run_for(self, dataset_name: str) -> None:
         dataset_samples = self.samples[dataset_name]
-        image_repository = self._create_repository(dataset_name)
-        pipeline = self._create_pipeline(dataset_name, image_repository)
+        image_repository = self.create_repository(dataset_name)
+        pipeline = self.create_pipeline(dataset_name, image_repository)
 
         LOGGER.info("Add {dataset_name} to image_repository")
         for sample in tqdm(dataset_samples):
             image_repository.add_image(sample.image_filepath)
         LOGGER.info("Starting the pipeline for `{dataset_name}`")
-        pipeline.run()
+
+
+        input = None
+        if self.create_pipeline_input is not None:
+            input = self.create_pipeline_input(self, image_repository, dataset_name)
+
+        state = {}
+        if self.create_pipeline_state is not None:
+            state = self.create_pipeline_state(self, image_repository, dataset_name)
+
+        run_pipeline(
+            pipeline, 
+            image_repository=image_repository,
+            input=input,
+            state=state,
+        )
         LOGGER.info("Ending the pipeline for `{dataset_name}`")
-        self._collect()
+        self._collect(image_repository, dataset_samples)
 
     def _collect(
         self,
@@ -70,8 +91,7 @@ class IMC2025Pipeline:
         dataset_samples: list[Prediction],
     ) -> None:
         filename_to_prediction = {
-            prediction.filename: prediction
-            for prediction in dataset_samples
+            prediction.filename: prediction for prediction in dataset_samples
         }
         for image_id in repository.image_ids():
             metadata: dict[str, str] = repository.get_metadata(image_id)
