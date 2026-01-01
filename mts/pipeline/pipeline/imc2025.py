@@ -91,7 +91,7 @@ class IMC2025Pipeline:
         dataset_samples: list[Prediction],
     ) -> None:
         filename_to_prediction = {
-            prediction.filename: prediction for prediction in dataset_samples
+            prediction.image_filepath: prediction for prediction in dataset_samples
         }
         for image_id in repository.image_ids():
             metadata: dict[str, str] = repository.get_metadata(image_id)

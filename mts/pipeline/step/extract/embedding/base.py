@@ -26,7 +26,7 @@ class GlobalDescriptorStep(BasePipelineStep):
             for image_index in tqdm.tqdm(
                 image_repository.image_ids(),
                 total=image_repository.images_num(),
-                desc="Extract keypoints and descriptors",
+                desc="Extract global the descriptors",
             ):
                 image = image_repository.load_image(image_index)
                 image = to_torch_format(image)

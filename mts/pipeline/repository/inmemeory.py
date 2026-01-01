@@ -96,19 +96,24 @@ class ImageRepository:
 
     def images_num(self):
         return len(self._images_filepath)
+    
+    def delete_metadata(self, name: str) -> None:
+        for k, metadata_dict in self._metadata.items():
+            if name in metadata_dict:
+                del metadata_dict[name]
 
     def add_metadata(self, image_id: ImageId, **kwargs):
         image_metadata_dict = self._metadata.setdefault(image_id, {})
         for k, v in kwargs.items():
             if k in image_metadata_dict:
-                raise ValueError(f"metadata `{k}` already exists")
+                raise AlreadyExistsException(f"metadata `{k}` already exists")
             image_metadata_dict[k] = v
 
     def update_metadata(self, image_id: ImageId, **kwargs):
         image_metadata_dict = self._metadata.setdefault(image_id, {})
         for k, v in kwargs.items():
             if k not in image_metadata_dict:
-                raise ValueError(f"metadata `{k}` does not exist")
+                raise NotFoundException(f"metadata `{k}` does not exist")
             image_metadata_dict[k] = v
 
     def upsert_metadata(self, image_id: ImageId, **kwargs):

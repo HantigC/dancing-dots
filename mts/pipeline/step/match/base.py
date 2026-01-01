@@ -25,7 +25,10 @@ class MatchingStep(BasePipelineStep):
     def run(self, image_repository: ImageRepository) -> None:
         device = self.device
         with torch.inference_mode():
-            for pair_idx in tqdm(image_repository.get_pairs()):
+            for pair_idx in tqdm(
+                image_repository.get_pairs(),
+                desc="Match the keypoints and descriptors",
+            ):
                 idx1, idx2 = pair_idx
 
                 kps1 = torch.from_numpy(

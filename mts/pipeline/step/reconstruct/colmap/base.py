@@ -1,4 +1,4 @@
-
+import logging
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from pathlib import Path
@@ -8,10 +8,13 @@ import pycolmap
 
 from mts.core.geometry.rigid3d import Rigid3D
 from mts.core.types import StateType
+from mts.helpers.colmap.database import COLMAPDatabase
 from mts.helpers.colmap.h5_to_db import CameraModel
 from mts.pipeline.repository.export.colmap import export_to_colmap
-from mts.pipeline.repository.inmemeory import ImageRepository
+from mts.pipeline.repository.inmemeory import AlreadyExistsException, ImageRepository
 from mts.pipeline.step.base import BasePipelineStep, use_image_repository
+
+LOGGER = logging.getLogger(__name__)
 
 
 class BaseColmapReconstructionStep(BasePipelineStep, ABC):
@@ -32,12 +35,16 @@ class BaseColmapReconstructionStep(BasePipelineStep, ABC):
         state: StateType,
     ) -> None:
         colmap_dirpath = Path(state["colmap_dirpath"])
-        db = export_to_colmap(
-            image_repository,
-            colmap_dirpath / "db",
-            self.single_camera,
-            self.camera_model,
-        )
+        colmap_db_filepath = colmap_dirpath / "colmap.db"
+        if not colmap_db_filepath.exists():
+            db = export_to_colmap(
+                image_repository,
+                colmap_db_filepath,
+                self.single_camera,
+                self.camera_model,
+            )
+        else:
+            db = COLMAPDatabase.connect(colmap_db_filepath)
         maps = self._run_colmap(
             image_repository=image_repository,
             input=input,
@@ -68,4 +75,8 @@ class BaseColmapReconstructionStep(BasePipelineStep, ABC):
                         deepcopy(rigid3d.translation),
                     ),
                 )
-                image_repository.add_metadata(image_id, cluster=map_index)
+                try:
+                    image_repository.add_metadata(image_id, cluster=map_index)
+                except AlreadyExistsException:
+                    LOGGER.warning("`%d` already has 'cluster' metadata", image_id)
+                    image_repository.update_metadata(image_id, cluster=map_index)
