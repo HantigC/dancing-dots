@@ -1,0 +1,98 @@
+from dataclasses import dataclass
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from mts.core.types import PathLike
+
+
+@dataclass
+class Prediction:
+    image_id: str | None
+    dataset: str
+    filename: str
+    image_filepath: Path
+    cluster_index: int | None = None
+    rotation: np.ndarray | None = None
+    translation: np.ndarray | None = None
+
+
+def _array_to_str(array: np.ndarray) -> str:
+    return ";".join([f"{x:.09f}" for x in array])
+
+
+def _none_to_str(n: int) -> str:
+    return ";".join(["nan"] * n)
+
+
+def to_df(samples: dict[str, list[Prediction]]) -> pd.DataFrame:
+    records = []
+    for dataset in samples.values():
+        for prediction in dataset:
+            cluster_name = (
+                "outliers"
+                if prediction.cluster_index is None
+                else f"cluster{prediction.cluster_index}"
+            )
+            rotation = (
+                _none_to_str(9)
+                if prediction.rotation is None
+                else _array_to_str(prediction.rotation.flatten())
+            )
+            translation = (
+                _none_to_str(3)
+                if prediction.translation is None
+                else _array_to_str(prediction.translation)
+            )
+            record = {
+                "dataset": prediction.dataset,
+                "scene": cluster_name,
+                "image": prediction.filename,
+                "rotation_matrix": rotation,
+                "translation_vector": translation,
+            }
+            records.append(record)
+    df = pd.DataFrame.from_records(records)
+    return df
+
+
+def load_from_df(
+    df: pd.DataFrame,
+    data_dirpath: PathLike,
+) -> dict[str, list[Prediction]]:
+    data_dirpath = Path(data_dirpath)
+    samples = {}
+    for _, row in df.iterrows():
+        if row.dataset not in samples:
+            samples[row.dataset] = []
+        samples[row.dataset].append(
+            Prediction(
+                image_id=row.image_id,
+                dataset=row.dataset,
+                filename=row.image,
+                image_filepath=data_dirpath / row.dataset / row.image,
+            )
+        )
+    return samples
+
+
+def load_from_train(
+    data_dirpath: PathLike,
+    filename: str = "train_labels.csv",
+) -> dict[str, list[Prediction]]:
+    data_dirpath = Path(data_dirpath)
+    sample_submission_csv = data_dirpath / filename
+    df = pd.read_csv(sample_submission_csv)
+    df["image_id"] = df.dataset + "_" + df.image
+    return load_from_df(df, data_dirpath)
+
+
+def load_from_test(
+    data_dirpath: PathLike,
+    filename: str = "sample_submission.csv",
+) -> dict[str, list[Prediction]]:
+    data_dirpath = Path(data_dirpath)
+    sample_submission_csv = data_dirpath / filename
+    df = pd.read_csv(sample_submission_csv)
+    return load_from_df(df, data_dirpath)

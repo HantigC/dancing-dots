@@ -2,9 +2,11 @@ from abc import ABC, abstractmethod
 from functools import wraps
 from typing import Any, Callable
 
+from hydra.utils import instantiate
+from omegaconf import OmegaConf
 from torch import nn
 
-from mts.core.types import StateType
+from mts.core.types import PathLike, StateType
 from mts.helpers.torch.nn import DeviceMixin
 from mts.pipeline.repository.inmemeory import ImageRepository
 
@@ -101,3 +103,11 @@ def run_pipeline(
             state=state,
         )
     return input
+
+
+def from_hydra_config(config_filepath: PathLike) -> list[BasePipelineStep]:
+    cfg = OmegaConf.load(config_filepath)
+    pipeline_steps = []
+    for step in cfg.pipeline["steps"].values():
+        pipeline_steps.append(instantiate(step))
+    return pipeline_steps
