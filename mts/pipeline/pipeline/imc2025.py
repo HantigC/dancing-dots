@@ -99,8 +99,9 @@ class IMC2025Pipeline:
             pose = repository.get_pose(image_id)
             prediction = filename_to_prediction[repository.get_filepath(image_id)]
             prediction.cluster_index = cluster
-            prediction.rotation = pose.rotation
-            prediction.translation = pose.translation
+            if pose is not None:
+                prediction.rotation = pose.rotation
+                prediction.translation = pose.translation
 
     @classmethod
     def from_samples_df(
