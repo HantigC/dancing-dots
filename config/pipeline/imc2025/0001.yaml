@@ -1,49 +1,53 @@
-name: IMC
+name: IMC2025
 description: Running reconstruction
 project_path: iterations
-pipeline:
-  steps:
-    embedder:
-      _target_: mts.pipeline.step.base.OnDeviceRunner
-      device: cuda:0
-      step:
-        _target_: mts.pipeline.step.extract.embedding.base.GlobalDescriptorStep
-        global_extractor:
-          _target_: mts.core.embedder.dinov2.DinoV2GlobalDescriptors.from_pretrained
-          model_location: weights/dinov2/base
+is_train: True
 
-    feature_extractor:
-      _target_: mts.pipeline.step.base.OnDeviceRunner
-      device: cuda:0
-      step:
-        _target_: mts.pipeline.step.extract.kp.base.TorchExtractStep
-        extractor:
-          _target_: mts.core.extractor.aliked.AlikedExtractor
-          num_features: 1024
-          resize_to: 1024
+pipeline_steps:
+  embedder:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.extract.embedding.base.GlobalDescriptorStep
+      global_extractor:
+        _target_: mts.core.embedder.dinov2.DinoV2GlobalDescriptors.from_pretrained
+        model_location: weights/dinov2/base
 
-    image_paring:
-        _target_: mts.pipeline.step.pair.cdist.CrossEmbeddingParerStep
+  feature_extractor:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.extract.kp.base.TorchExtractStep
+      extractor:
+        _target_: mts.core.extractor.aliked.AlikedExtractor
+        num_features: 1024
+        resize_to: 1024
 
-    kp_matching: 
-      _target_: mts.pipeline.step.base.OnDeviceRunner
-      device: cuda:0
-      step:
-        _target_: mts.pipeline.step.match.base.MatchingStep
-        matcher:
-          _target_: mts.core.matcher.lg.LightGlueMatcher.from_config
-          feature_name: aliked
-          params: 
-            width_confidence: -1
-            depth_confidence: -1
-            mp: True
+  image_paring:
+      _target_: mts.pipeline.step.pair.cdist.CrossEmbeddingParerStep
 
-    reconstruction:
-      _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep
-      mapper_options:
-        _target_: mts.helpers.colmap.options.create_incremental_pipeline_options
-        min_model_size: 3
-        max_num_models: 25
+  kp_matching: 
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.match.base.MatchingStep
+      matcher:
+        _target_: mts.core.matcher.lg.LightGlueMatcher.from_config
+        feature_name: aliked
+        params: 
+          width_confidence: -1
+          depth_confidence: -1
+          mp: True
+
+  reconstruction:
+    _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep
+    mapper_options:
+      _target_: mts.helpers.colmap.options.create_incremental_pipeline_options
+      min_model_size: 3
+      max_num_models: 25
 
 
-
+reconstruction_runner:
+  create_pipeline_method: app.imc2025.pipeline.create_pipeline
+  create_repository_method: app.imc2025.pipeline.create_repository
+  create_pipeline_state_method: app.imc2025.pipeline.create_pipeline_state

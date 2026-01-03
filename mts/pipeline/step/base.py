@@ -105,9 +105,13 @@ def run_pipeline(
     return input
 
 
-def from_hydra_config(config_filepath: PathLike) -> list[BasePipelineStep]:
+def from_hydra_config_file(config_filepath: PathLike) -> list[BasePipelineStep]:
     cfg = OmegaConf.load(config_filepath)
+    return from_hydra_config(cfg)
+
+
+def from_hydra_config(cfg) -> list[BasePipelineStep]:
     pipeline_steps = []
-    for step in cfg.pipeline["steps"].values():
+    for step in cfg.pipeline_steps.values():
         pipeline_steps.append(instantiate(step))
     return pipeline_steps

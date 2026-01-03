@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable
 
 import pandas as pd
@@ -9,7 +10,7 @@ from tqdm.auto import tqdm
 
 from mts.core.types import PathLike, StateType
 from mts.pipeline.repository.inmemeory import ImageRepository
-from mts.pipeline.step.base import run_pipeline
+from mts.pipeline.step.base import from_hydra_config, run_pipeline
 from mts.pipeline.step.extract.kp.base import BasePipelineStep
 
 from .prediction import Prediction
@@ -127,3 +128,32 @@ class IMC2025Pipeline:
         filename: str = "train_labels.csv",
     ) -> IMC2025Pipeline:
         pass
+
+
+def create_repository(dataset_name: str) -> ImageRepository:
+    image_repository = ImageRepository()
+    image_repository.add_repository_metadata(dataset_name=dataset_name)
+    return image_repository
+
+
+def create_pipeline(
+    cfg,
+    image_repository: ImageRepository,
+    dataset_name: str,
+) -> list[BasePipelineStep]:
+    pipeline_steps = from_hydra_config(cfg)
+    return pipeline_steps
+
+
+def create_pipeline_state(
+    imc2025_pipeline: IMC2025Pipeline,
+    image_repository: ImageRepository,
+    dataset_name: str,
+) -> StateType:
+    dataset_dirpath = Path(imc2025_pipeline.project_dirpath) / dataset_name
+    dataset_dirpath.mkdir(exist_ok=True)
+    state = {
+        "images_dir": ".",
+        "colmap_dirpath": dataset_dirpath,
+    }
+    return state
