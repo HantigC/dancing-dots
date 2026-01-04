@@ -27,8 +27,7 @@ def create_imc2025_from_cfg(cfg):
     data_dirpath = Path(cfg.get("data_dirpath", "data"))
     cfg.data_dirpath = data_dirpath
     samples_filename = cfg.get("sample_filepath", "train_labels.csv")
-    samples_filepath = data_dirpath / samples_filename
-    samples = load_from_csv(data_dirpath / samples_filepath)
+    samples = load_from_csv(data_dirpath, samples_filename)
 
     imc2025_pipeline = IMC2025Pipeline(
         last_project_iteration.iteration_dirpath,

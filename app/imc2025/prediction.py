@@ -101,12 +101,13 @@ def load_from_test(
     return load_from_df(df, data_dirpath)
 
 
-def load_from_csv(csv_filepath: PathLike) -> DatasetSamples:
-    csv_filepath = Path(csv_filepath)
+def load_from_csv(data_dirpath: PathLike, filename: str) -> DatasetSamples:
+    data_dirpath = Path(data_dirpath)
+    csv_filepath = data_dirpath / filename
     df = pd.read_csv(csv_filepath)
     if "image_id" not in df.columns:
         df["image_id"] = df.dataset + "_" + df.image
-    return load_from_df(df)
+    return load_from_df(df, data_dirpath)
 
 
 def sample_to_csv(
