@@ -36,6 +36,7 @@ def create_imc2025_from_cfg(cfg):
         partial(create_pipeline, cfg),
         create_pipeline_state=create_pipeline_state,
     )
+    cfg.origin = imc2025_pipeline.project_dirpath
     return imc2025_pipeline
 
 
@@ -48,7 +49,7 @@ def run_from_cfg(cfg) -> IMC2025Pipeline:
     )
     OmegaConf.save(cfg, imc2025_pipeline.project_dirpath / "config.yaml")
     datasets_names = cfg.get("datasets_names", ALL)
-    imc2025_pipeline.run(datasets_names)
+    imc2025_pipeline.run(list(datasets_names))
     is_train = cfg.get("is_train", True)
 
     submission_filepath = imc2025_pipeline.project_dirpath / "submission.csv"
@@ -79,7 +80,6 @@ def run_from_cfg(cfg) -> IMC2025Pipeline:
 
 def run_from_config_filepath(hydra_config_filepath: PathLike) -> IMC2025Pipeline:
     cfg = OmegaConf.load(hydra_config_filepath)
-    cfg.origin = hydra_config_filepath
     run_from_cfg(cfg)
 
 

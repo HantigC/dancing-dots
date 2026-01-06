@@ -57,10 +57,10 @@ class IMC2025Pipeline:
         image_repository = self.create_repository(dataset_name)
         pipeline = self.create_pipeline(dataset_name, image_repository)
 
-        LOGGER.info("Add {dataset_name} to image_repository")
-        for sample in tqdm(dataset_samples):
+        LOGGER.info("Add `%s` to image_repository", dataset_name)
+        for sample in tqdm(dataset_samples, desc="Add images to repository"):
             image_repository.add_image(sample.image_filepath)
-        LOGGER.info("Starting the pipeline for `{dataset_name}`")
+        LOGGER.info("Starting the pipeline for `%s`", dataset_name)
 
         input = None
         if self.create_pipeline_input is not None:
@@ -93,13 +93,13 @@ class IMC2025Pipeline:
             cluster_index = metadata.get("cluster")
             pose = repository.get_pose(image_id)
             prediction = filename_to_prediction[repository.get_filepath(image_id)]
-            prediction.cluster_index = cluster_index + self._last_cluster_index
             if pose is not None:
                 prediction.rotation = pose.rotation
                 prediction.translation = pose.translation
 
             if cluster_index is not None:
                 how_many_clusters = max(how_many_clusters, cluster_index)
+                prediction.cluster_index = cluster_index + self._last_cluster_index
         self._last_cluster_index += how_many_clusters + 1
 
     @classmethod

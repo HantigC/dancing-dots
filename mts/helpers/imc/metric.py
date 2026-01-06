@@ -770,7 +770,7 @@ def score(
             print(f'\tPrivate split: score={final_score_mask_b:.2f}% (mAA={final_mAA_mask_b:.2f}%, clusterness={final_clusterness_mask_b:.2f}%)')
 
     scene_score_dict = {dataset: float(score * 100) for dataset, score in zip(gt_data, stat_score)}
-    scene_clusterness_dict = {dataset: float(score * 100) for dataset, score in zip(gt_data, cluster_score)}
+    scene_clusterness_dict = {dataset: float(score * 100) for dataset, score in zip(gt_data, stat_clusterness)}
     scene_score_dict_mask_a = (
         None
         if mask_csv is None

@@ -55,9 +55,6 @@ class MatchingStep(BasePipelineStep):
 
                 n_matches = len(idxs)
                 if n_matches >= self.min_matches:
-                    LOGGER.info(
-                        "Matched (%d, %d) having %d of matches", idx1, idx2, len(idxs)
-                    )
                     image_repository.add_matches(
                         idx1,
                         idx2,

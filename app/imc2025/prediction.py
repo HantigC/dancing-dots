@@ -88,7 +88,7 @@ def load_from_train(
     sample_submission_csv = data_dirpath / filename
     df = pd.read_csv(sample_submission_csv)
     df["image_id"] = df.dataset + "_" + df.image
-    return load_from_df(df, data_dirpath)
+    return load_from_df(df, data_dirpath / "train")
 
 
 def load_from_test(
@@ -98,16 +98,18 @@ def load_from_test(
     data_dirpath = Path(data_dirpath)
     sample_submission_csv = data_dirpath / filename
     df = pd.read_csv(sample_submission_csv)
-    return load_from_df(df, data_dirpath)
+    return load_from_df(df, data_dirpath / "test")
 
 
 def load_from_csv(data_dirpath: PathLike, filename: str) -> DatasetSamples:
     data_dirpath = Path(data_dirpath)
     csv_filepath = data_dirpath / filename
     df = pd.read_csv(csv_filepath)
+    train_or_test = "test"
     if "image_id" not in df.columns:
         df["image_id"] = df.dataset + "_" + df.image
-    return load_from_df(df, data_dirpath)
+        train_or_test = "train"
+    return load_from_df(df, data_dirpath / train_or_test)
 
 
 def sample_to_csv(
