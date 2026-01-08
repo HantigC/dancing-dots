@@ -48,8 +48,12 @@ def run_from_cfg(cfg) -> IMC2025Pipeline:
         str(imc2025_pipeline.project_dirpath),
     )
     OmegaConf.save(cfg, imc2025_pipeline.project_dirpath / "config.yaml")
-    datasets_names = cfg.get("datasets_names", ALL)
-    imc2025_pipeline.run(list(datasets_names))
+    datasets_names = cfg.get("datasets_names")
+    if datasets_names is not None:
+        datasets_names = list(datasets_names)
+    else:
+        datasets_names = ALL
+    imc2025_pipeline.run(datasets_names)
     is_train = cfg.get("is_train", True)
 
     submission_filepath = imc2025_pipeline.project_dirpath / "submission.csv"
