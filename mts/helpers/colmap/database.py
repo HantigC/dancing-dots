@@ -119,6 +119,7 @@ class SQLQuery:
     SELECT_IMAGE_IDS = "select image_id from images;"
 
     FETCH_IMAGES = "select * from images;"
+    FETCH_MATCHES = "select * from matches;"
 
     DELETE_KP = "DELETE FROM keypoints WHERE image_id = {image_id};"
     DELETE_DESCRIPTORS = "DELETE FROM descriptors WHERE image_id = {image_id};"
@@ -133,7 +134,7 @@ def image_ids_to_pair_id(image_id1, image_id2):
 def pair_id_to_image_ids(pair_id):
     image_id2 = pair_id % MAX_IMAGE_ID
     image_id1 = (pair_id - image_id2) / MAX_IMAGE_ID
-    return image_id1, image_id2
+    return int(image_id1), int(image_id2)
 
 
 def array_to_blob(array):
@@ -284,6 +285,17 @@ class COLMAPDatabase(sqlite3.Connection):
 
     def fetch_images(self, eager=False, as_dict=True):
         rows = self.execute(SQLQuery.FETCH_IMAGES)
+        if as_dict:
+            description = rows.description
+            rows = (dictify_row(description, row) for row in rows)
+
+        if eager:
+            return list(rows)
+
+        return rows
+
+    def fetch_matches(self, eager=False, as_dict=True):
+        rows = self.execute(SQLQuery.FETCH_MATCHES)
         if as_dict:
             description = rows.description
             rows = (dictify_row(description, row) for row in rows)
