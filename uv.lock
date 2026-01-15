@@ -309,6 +309,14 @@ wheels = [
 ]
 
 [[package]]
+name = "croco"
+version = "0.1.2"
+source = { path = "deps/wheels/croco-0.1.2-py3-none-any.whl" }
+wheels = [
+    { filename = "croco-0.1.2-py3-none-any.whl", hash = "sha256:ee26071c4c63f454d043c38f851cc692ee9d956bcd18a90996b21325df7e23a2" },
+]
+
+[[package]]
 name = "cycler"
 version = "0.12.1"
 source = { registry = "https://pypi.org/simple" }
@@ -356,11 +364,15 @@ name = "disertation"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "croco" },
+    { name = "dust3r" },
+    { name = "einops" },
     { name = "h5py" },
     { name = "hloc" },
     { name = "hydra-core" },
     { name = "kornia" },
     { name = "lightglue" },
+    { name = "mast3r" },
     { name = "matplotlib" },
     { name = "more-itertools" },
     { name = "nbformat" },
@@ -381,11 +393,15 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "croco", path = "deps/wheels/croco-0.1.2-py3-none-any.whl" },
+    { name = "dust3r", path = "deps/wheels/dust3r-0.1.0-py3-none-any.whl" },
+    { name = "einops", specifier = ">=0.8.1" },
     { name = "h5py", specifier = ">=3.15.1" },
     { name = "hloc", git = "https://github.com/cvg/Hierarchical-Localization.git" },
     { name = "hydra-core", specifier = ">=1.3.2" },
     { name = "kornia", specifier = ">=0.8.2" },
     { name = "lightglue", specifier = ">=0.0" },
+    { name = "mast3r", path = "deps/wheels/mast3r-0.1.0-py3-none-any.whl" },
     { name = "matplotlib", specifier = ">=3.10.7" },
     { name = "more-itertools", specifier = ">=10.8.0" },
     { name = "nbformat", specifier = ">=5.10.4" },
@@ -401,6 +417,23 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [{ name = "ipykernel", specifier = ">=7.1.0" }]
+
+[[package]]
+name = "dust3r"
+version = "0.1.0"
+source = { path = "deps/wheels/dust3r-0.1.0-py3-none-any.whl" }
+wheels = [
+    { filename = "dust3r-0.1.0-py3-none-any.whl", hash = "sha256:b4313794fd89ff3d7ee7ebdf1210ed852f6f505bbffad9fdfe712fabe4814b2b" },
+]
+
+[[package]]
+name = "einops"
+version = "0.8.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/81/df4fbe24dff8ba3934af99044188e20a98ed441ad17a274539b74e82e126/einops-0.8.1.tar.gz", hash = "sha256:de5d960a7a761225532e0f1959e5315ebeafc0cd43394732f103ca44b9837e84", size = 54805, upload-time = "2025-02-09T03:17:00.434Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/62/9773de14fe6c45c23649e98b83231fffd7b9892b6cf863251dc2afa73643/einops-0.8.1-py3-none-any.whl", hash = "sha256:919387eb55330f5757c6bea9165c5ff5cfe63a642682ea788a6d472576d81737", size = 64359, upload-time = "2025-02-09T03:17:01.998Z" },
+]
 
 [[package]]
 name = "executing"
@@ -1001,6 +1034,14 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fb/df/5bd7a48c256faecd1d36edc13133e51397e41b73bb77e1a69deab746ebac/markupsafe-3.0.3-cp314-cp314t-win32.whl", hash = "sha256:915c04ba3851909ce68ccc2b8e2cd691618c4dc4c4232fb7982bca3f41fd8c3d", size = 14819, upload-time = "2025-09-27T18:37:26.285Z" },
     { url = "https://files.pythonhosted.org/packages/1a/8a/0402ba61a2f16038b48b39bccca271134be00c5c9f0f623208399333c448/markupsafe-3.0.3-cp314-cp314t-win_amd64.whl", hash = "sha256:4faffd047e07c38848ce017e8725090413cd80cbc23d86e55c587bf979e579c9", size = 15426, upload-time = "2025-09-27T18:37:27.316Z" },
     { url = "https://files.pythonhosted.org/packages/70/bc/6f1c2f612465f5fa89b95bead1f44dcb607670fd42891d8fdcd5d039f4f4/markupsafe-3.0.3-cp314-cp314t-win_arm64.whl", hash = "sha256:32001d6a8fc98c8cb5c947787c5d08b0a50663d139f1305bac5885d98d9b40fa", size = 14146, upload-time = "2025-09-27T18:37:28.327Z" },
+]
+
+[[package]]
+name = "mast3r"
+version = "0.1.0"
+source = { path = "deps/wheels/mast3r-0.1.0-py3-none-any.whl" }
+wheels = [
+    { filename = "mast3r-0.1.0-py3-none-any.whl", hash = "sha256:6a5367dd9d097d6549129a74ab15b29daf9f397fd8b04242627b79b53679f0d8" },
 ]
 
 [[package]]
