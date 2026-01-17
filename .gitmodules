@@ -1,0 +1,3 @@
+[submodule "deps/submodules/asmk"]
+	path = deps/submodules/asmk
+	url = https://github.com/jenicek/asmk.git

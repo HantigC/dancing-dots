@@ -3,11 +3,14 @@ name = "disertation"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = "==3.11.14"
 dependencies = [
+    "asmk",
+    "build>=1.4.0",
     "croco",
     "dust3r",
     "einops>=0.8.1",
+    "faiss-cpu>=1.13.2",
     "h5py>=3.15.1",
     "hloc",
     "hydra-core>=1.3.2",
@@ -22,14 +25,19 @@ dependencies = [
     "plotly>=6.4.0",
     "py3nvml>=0.2.7",
     "pycolmap>=3.13.0",
-    "torch>=2.9.0",
+    "torch==2.5",
     "tqdm>=4.67.1",
     "transformers>=4.57.1",
 ]
 
 [dependency-groups]
+build = [
+    "setuptools>=80.9.0",
+]
 dev = [
+    "cython>=3.2.4",
     "ipykernel>=7.1.0",
+    "pip>=25.3",
 ]
 
 [tool.uv.sources]
@@ -37,3 +45,4 @@ hloc = { git = "https://github.com/cvg/Hierarchical-Localization.git" }
 croco = { path = "deps/wheels/croco-0.1.2-py3-none-any.whl" }
 dust3r = { path = "deps/wheels/dust3r-0.1.0-py3-none-any.whl" }
 mast3r = { path = "deps/wheels/mast3r-0.1.0-py3-none-any.whl" }
+asmk = { path = "deps/wheels/asmk-0.1-cp311-cp311-linux_x86_64.whl" }
