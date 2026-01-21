@@ -1,4 +1,5 @@
 import logging
+from sqlite3 import IntegrityError
 
 from tqdm.auto import tqdm
 
@@ -68,8 +69,12 @@ def add_keypoints(
                 camera_model,
             )
         db_image_id = db.add_image(str(image_filepath), camera_id)
-        db.add_keypoints(db_image_id, keypoints)
-        db.add_descriptors(image_id, descriptors)
+
+        if keypoints is not None:
+            db.add_keypoints(db_image_id, keypoints)
+
+        if descriptors is not None:
+            db.add_descriptors(image_id, descriptors)
         id_to_db_id[image_id] = db_image_id
 
     return id_to_db_id
@@ -88,6 +93,10 @@ def add_matches(
     ):
         from_db_id = id_to_db_id[from_idx]
         to_db_id = id_to_db_id[to_idx]
+
         matches = image_repository.get_matches(from_idx, to_idx)
         if matches is not None:
-            db.add_matches(from_db_id, to_db_id, matches)
+            try:
+                db.add_matches(from_db_id, to_db_id, matches)
+            except IntegrityError:
+                LOGGER.warning("(%d, %d) is already inserted", from_idx, to_idx)

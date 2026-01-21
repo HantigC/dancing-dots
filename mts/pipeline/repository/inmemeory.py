@@ -56,7 +56,7 @@ class ImageRepository:
         for st_id, nd_id in pairs:
             self._pairs_map.setdefault(st_id, []).append(nd_id)
             self._pairs_map.setdefault(nd_id, []).append(st_id)
-        self._pairs.extend(pairs)
+        self._pairs.extend([tuple(sorted(pair)) for pair in pairs])
 
     def get_pairs(self) -> list[PairType[ImageId]]:
         return self._pairs
@@ -82,6 +82,9 @@ class ImageRepository:
         self._id_to_filepath[img_id] = filepath
         self._next_id += 1
         return img_id
+
+    def image_filepaths(self) -> Generator[Path, None, None]:
+        return (self._id_to_filepath[image_id] for image_id in self.image_ids())
 
     def get_image_id(self, filepath: PathLike) -> int | None:
         """Return the ID for a filepath, or None if not found."""

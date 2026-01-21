@@ -1,0 +1,36 @@
+name: IMC2025
+description: |
+  Reconstruction using mast3r for pair computation and keypoints matching. 
+project_path: iterations
+is_train: True
+
+pipeline_steps:
+  paring:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.pair.mast3r.Mast3rParer.from_checkpoints
+      model_checkpoint: "checkpoints/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
+      retrieval_checkpoint: "checkpoints/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric_retrieval_trainingfree.pth"
+      scene_graph: retrieval-20-40
+
+  kp_matching: 
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.match.mast3r.Mast3rMatchPipelineStep.from_checkpoint
+      mast3r_model_checkpoint: "checkpoints/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
+      min_pairs: 15
+      match_conf_th: 1.001
+
+  reconstruction:
+    _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep
+    mapper_options:
+      _target_: mts.helpers.colmap.options.create_incremental_pipeline_options
+      min_model_size: 3
+      max_num_models: 25
+
+reconstruction_runner:
+  create_pipeline_method: app.imc2025.pipeline.create_pipeline
+  create_repository_method: app.imc2025.pipeline.create_repository
+  create_pipeline_state_method: app.imc2025.pipeline.create_pipeline_state
