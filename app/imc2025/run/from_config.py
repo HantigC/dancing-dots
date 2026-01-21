@@ -13,6 +13,7 @@ from app.imc2025.prediction import load_from_csv, sample_to_csv
 from mts.core.types import PathLike
 from mts.helpers.imc import metric
 from mts.helpers.project.project import Project
+from mts.utils.git import get_git_commit
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,6 +48,7 @@ def run_from_cfg(cfg) -> IMC2025Pipeline:
         str(cfg.origin),
         str(imc2025_pipeline.project_dirpath),
     )
+    cfg.git_commit = get_git_commit()
     OmegaConf.save(cfg, imc2025_pipeline.project_dirpath / "config.yaml")
     datasets_names = cfg.get("datasets_names")
     if datasets_names is not None:
