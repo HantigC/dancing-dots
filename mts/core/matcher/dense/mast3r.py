@@ -14,7 +14,7 @@ from mts.core.model.mast3r.transform import transform_keypoints_to_original
 from mts.core.types import PairType
 
 
-def match_pairs(
+def extract_dense_keypoints(
     mast3r_model: AsymmetricMASt3R,
     index_pairs: list[PairType[int]],
     image_list: list[str],
@@ -104,6 +104,29 @@ def match_pairs(
         out_match[key1][key2] = np.concatenate(
             [matches_im0_org, matches_im1_org], axis=1
         )
+    return out_match
+
+
+
+def match_pairs(
+    mast3r_model: AsymmetricMASt3R,
+    index_pairs: list[PairType[int]],
+    image_list: list[str],
+    min_pairs: int = 15,
+    match_conf_th: float = 1.001,
+    device: str | torch.device = None,
+) -> tuple[
+    dict[str, np.ndarray],
+    dict[tuple[str, str], np.ndarray],
+]:
+    out_match = extract_dense_keypoints(
+        mast3r_model,
+        index_pairs,
+        image_list,
+        min_pairs=min_pairs,
+        match_conf_th=match_conf_th,
+        device=device,
+    )
 
     global_keypoints, global_matches = merge_matches(out_match)
     # print("points and matches unified")
