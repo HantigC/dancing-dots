@@ -2,14 +2,17 @@ from typing import Any, Sequence
 
 
 def extract_kwargs(
-    kwargs: dict[str],
-    what_dict: list[str] | str,
+    kwargs: dict[str, str | int | list],
+    names: list[str] | str,
     merge: bool = False,
-) -> tuple[dict[str, dict], dict]:
-    if not isinstance(what_dict, list):
-        what_dict = [what_dict]
+) -> dict[str, dict[str, Any]] | tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    if not isinstance(names, list):
+        if isinstance(names, str):
+            names = [names]
+        else:
+            raise ValueError(f"What dict should be of type list[str] | str, not {names.__class__.name}")
 
-    what_dict = {w: {} for w in what_dict}
+    what_dict: dict[str, dict[str, Any]] = {w: {} for w in names}
     left_dict = {}
     for k, v in kwargs.items():
         try:

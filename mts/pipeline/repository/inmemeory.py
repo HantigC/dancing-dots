@@ -7,20 +7,12 @@ from mts.core.geometry.rigid3d import Rigid3D
 from mts.core.types import ImageId, PairType, PathLike
 from mts.utils.image import imread_rgb
 
-
-class RepositoryException(BaseException):
-    """Repository related exception."""
+from .base import AlreadyExistsException, BaseImageRepository, NotFoundException
 
 
-class NotFoundException(RepositoryException):
-    """Raised in case an item is not found inside the repository"""
 
 
-class AlreadyExistsException(RepositoryException):
-    """Raised in case an item already exists inside the repository"""
-
-
-class ImageRepository:
+class ImageRepository(BaseImageRepository):
     def __init__(self):
         self._repository_metadata = {}
         # filepath → integer ID
@@ -49,29 +41,6 @@ class ImageRepository:
                 )
             self._repository_metadata[k] = v
 
-    def pair_num(self) -> int:
-        return len(self._pairs)
-
-    def add_pairs(self, pairs: list[PairType[ImageId]]) -> None:
-        for st_id, nd_id in pairs:
-            self._pairs_map.setdefault(st_id, []).append(nd_id)
-            self._pairs_map.setdefault(nd_id, []).append(st_id)
-        self._pairs.extend([tuple(sorted(pair)) for pair in pairs])
-
-    def get_pairs(self) -> list[PairType[ImageId]]:
-        return self._pairs
-
-    def iterate_over_images(self) -> Generator[np.ndarray, None, None]:
-        for id in self._id_to_filepath:
-            yield id, self.load_image(id)
-
-    def image_ids(self) -> Generator[int, None, None]:
-        for id in self._id_to_filepath:
-            yield id
-
-    def load_image(self, image_id: int) -> np.ndarray:
-        return imread_rgb(self._id_to_filepath[image_id])
-
     def add_image(self, filepath: str) -> int:
         """Add an image filepath and return its integer ID."""
         if filepath in self._images_filepath:
@@ -83,27 +52,33 @@ class ImageRepository:
         self._next_id += 1
         return img_id
 
-    def image_filepaths(self) -> Generator[Path, None, None]:
-        return (self._id_to_filepath[image_id] for image_id in self.image_ids())
+    def image_ids(self) -> Generator[int, None, None]:
+        for id in self._id_to_filepath:
+            yield id
+
+    def images_num(self):
+        return len(self._images_filepath)
 
     def get_image_id(self, filepath: PathLike) -> int | None:
         """Return the ID for a filepath, or None if not found."""
         image_id = self._images_filepath.get(filepath)
         if image_id is None:
             image_id = self._images_filepath.get(Path(filepath))
-        return  image_id
+        return image_id
 
     def get_filepath(self, img_id: int) -> str | None:
         """Return the filepath for a given image ID."""
         return self._id_to_filepath.get(img_id)
 
-    def images_num(self):
-        return len(self._images_filepath)
-    
-    def delete_metadata(self, name: str) -> None:
-        for k, metadata_dict in self._metadata.items():
-            if name in metadata_dict:
-                del metadata_dict[name]
+    def image_filepaths(self) -> Generator[Path, None, None]:
+        return (self._id_to_filepath[image_id] for image_id in self.image_ids())
+
+    def iterate_over_images(self) -> Generator[tuple[ImageId, np.ndarray], None, None]:
+        for id in self._id_to_filepath:
+            yield id, self.load_image(id)
+
+    def load_image(self, image_id: int) -> np.ndarray:
+        return imread_rgb(self._id_to_filepath[image_id])
 
     def add_metadata(self, image_id: ImageId, **kwargs):
         image_metadata_dict = self._metadata.setdefault(image_id, {})
@@ -123,6 +98,11 @@ class ImageRepository:
         image_metadata_dict = self._metadata.setdefault(image_id, {})
         for k, v in kwargs.items():
             image_metadata_dict[k] = v
+
+    def delete_metadata(self, name: str) -> None:
+        for k, metadata_dict in self._metadata.items():
+            if name in metadata_dict:
+                del metadata_dict[name]
 
     def get_metadata(self, image_id: ImageId):
         image_metadata_dict = self._metadata.setdefault(image_id, {})
@@ -144,17 +124,17 @@ class ImageRepository:
     def get_keypoints(self, img_id: int) -> np.ndarray | None:
         return self._keypoints.get(img_id)
 
-    def add_global_descriptor(self, img_id: int, keypoints: np.ndarray):
-        self._global_descriptors[img_id] = keypoints
-
-    def get_global_descriptor(self, img_id: int) -> np.ndarray | None:
-        return self._global_descriptors.get(img_id)
-
     def add_descriptors(self, img_id: int, descriptors: np.ndarray):
         self._descriptors[img_id] = descriptors
 
     def get_descriptors(self, img_id: int) -> np.ndarray | None:
         return self._descriptors.get(img_id)
+
+    def add_global_descriptor(self, img_id: int, keypoints: np.ndarray):
+        self._global_descriptors[img_id] = keypoints
+
+    def get_global_descriptor(self, img_id: int) -> np.ndarray | None:
+        return self._global_descriptors.get(img_id)
 
     def add_matches(self, img_id1: int, img_id2: int, matches: np.ndarray):
         key = tuple(sorted((img_id1, img_id2)))
@@ -163,3 +143,15 @@ class ImageRepository:
     def get_matches(self, img_id1: int, img_id2: int) -> np.ndarray | None:
         key = tuple(sorted((img_id1, img_id2)))
         return self._matches.get(key)
+
+    def add_pairs(self, pairs: list[PairType[ImageId]]) -> None:
+        for st_id, nd_id in pairs:
+            self._pairs_map.setdefault(st_id, []).append(nd_id)
+            self._pairs_map.setdefault(nd_id, []).append(st_id)
+        self._pairs.extend([tuple(sorted(pair)) for pair in pairs])
+
+    def get_pairs(self) -> list[PairType[ImageId]]:
+        return self._pairs
+
+    def pair_num(self) -> int:
+        return len(self._pairs)

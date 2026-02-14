@@ -5,11 +5,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-import pandas as pd
 from tqdm.auto import tqdm
 
 from mts.core.types import PathLike, StateType
-from mts.pipeline.repository.inmemeory import ImageRepository
+from mts.pipeline.repository import h5 as h5_repo
+from mts.pipeline.repository import inmemeory as mem_repo
+from mts.pipeline.repository.base import BaseImageRepository
 from mts.pipeline.step.base import from_hydra_config, run_pipeline
 from mts.pipeline.step.extract.kp.base import BasePipelineStep
 
@@ -25,15 +26,16 @@ ALL = "all"
 class IMC2025Pipeline:
     project_dirpath: PathLike
     samples: dict[str, list[Prediction]]
-    create_repository: Callable[[str], ImageRepository]
-    create_pipeline: Callable[[str, ImageRepository], BasePipelineStep]
+    create_repository: Callable[[str, IMC2025Pipeline], BaseImageRepository]
+    create_pipeline: Callable[[str, BaseImageRepository], BasePipelineStep]
     create_pipeline_input: (
-        Callable[[IMC2025Pipeline, ImageRepository, str], Any] | None
+        Callable[[IMC2025Pipeline, BaseImageRepository, str], Any] | None
     ) = field(default=None)
     create_pipeline_state: (
-        Callable[[IMC2025Pipeline, ImageRepository, str], StateType] | None
+        Callable[[IMC2025Pipeline, BaseImageRepository, str], StateType] | None
     ) = field(default=None)
     _last_cluster_index: int = field(default=0)
+    _repositories_map: dict[str, BaseImageRepository] = field(default_factory=dict)
 
     def _get_dataset_names(self, datasets_names: list[str] | str = ALL) -> list[str]:
         if isinstance(datasets_names, str) and datasets_names == ALL:
@@ -54,7 +56,8 @@ class IMC2025Pipeline:
 
     def run_for(self, dataset_name: str) -> None:
         dataset_samples = self.samples[dataset_name]
-        image_repository = self.create_repository(dataset_name)
+        image_repository = self.create_repository(dataset_name, self)
+        self._repositories_map[dataset_name] = image_repository
         pipeline = self.create_pipeline(dataset_name, image_repository)
 
         LOGGER.info("Add `%s` to image_repository", dataset_name)
@@ -81,7 +84,7 @@ class IMC2025Pipeline:
 
     def _collect(
         self,
-        repository: ImageRepository,
+        repository: BaseImageRepository,
         dataset_samples: list[Prediction],
     ) -> None:
         filename_to_prediction = {
@@ -102,43 +105,31 @@ class IMC2025Pipeline:
                 prediction.cluster_index = cluster_index + self._last_cluster_index
         self._last_cluster_index += how_many_clusters + 1
 
-    @classmethod
-    def from_samples_df(
-        cls,
-        df: pd.DataFrame,
-        data_dirpath: PathLike,
-        pipeline: BasePipelineStep,
-    ) -> IMC2025Pipeline:
-        pass
 
-    @classmethod
-    def from_test_dir(
-        cls,
-        data_dirpath: PathLike,
-        pipeline: BasePipelineStep,
-        filename: str = "sample_submission.csv",
-    ) -> IMC2025Pipeline:
-        pass
-
-    @classmethod
-    def from_train_dir(
-        cls,
-        data_dirpath: PathLike,
-        pipeline: BasePipelineStep,
-        filename: str = "train_labels.csv",
-    ) -> IMC2025Pipeline:
-        pass
+def create_inmemory_repository(
+    dataset_name: str,
+    imc2025_pipeline: IMC2025Pipeline,
+) -> mem_repo.ImageRepository:
+    image_repository = mem_repo.ImageRepository()
+    image_repository.add_repository_metadata(dataset_name=dataset_name)
+    return image_repository
 
 
-def create_repository(dataset_name: str) -> ImageRepository:
-    image_repository = ImageRepository()
+def create_h5_repository(
+    dataset_name: str,
+    imc2025_pipeline: IMC2025Pipeline,
+) -> h5_repo.H5ImageRepository:
+    dataset_filepath = (
+        imc2025_pipeline.project_dirpath / "h5_repositories" / dataset_name
+    )
+    image_repository = h5_repo.H5ImageRepository(dataset_filepath)
     image_repository.add_repository_metadata(dataset_name=dataset_name)
     return image_repository
 
 
 def create_pipeline(
     cfg,
-    image_repository: ImageRepository,
+    image_repository: BaseImageRepository,
     dataset_name: str,
 ) -> list[BasePipelineStep]:
     pipeline_steps = from_hydra_config(cfg)
@@ -147,7 +138,7 @@ def create_pipeline(
 
 def create_pipeline_state(
     imc2025_pipeline: IMC2025Pipeline,
-    image_repository: ImageRepository,
+    image_repository: BaseImageRepository,
     dataset_name: str,
 ) -> StateType:
     dataset_dirpath = Path(imc2025_pipeline.project_dirpath) / dataset_name

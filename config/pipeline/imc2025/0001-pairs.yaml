@@ -1,0 +1,22 @@
+name: IMC2025
+description: Compute pairs using dinov2
+project_path: iterations
+is_train: True
+
+pipeline_steps:
+  embedder:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.extract.embedding.base.GlobalDescriptorStep
+      global_extractor:
+        _target_: mts.core.embedder.dinov2.DinoV2GlobalDescriptors.from_pretrained
+        model_location: weights/dinov2/base
+
+  image_paring:
+      _target_: mts.pipeline.step.pair.cdist.CrossEmbeddingParerStep
+
+reconstruction_runner:
+  create_pipeline_method: app.imc2025.pipeline.create_pipeline
+  create_repository_method: app.imc2025.pipeline.create_repository
+  create_pipeline_state_method: app.imc2025.pipeline.create_pipeline_state
