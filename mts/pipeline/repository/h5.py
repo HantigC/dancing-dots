@@ -57,7 +57,7 @@ class H5ImageRepository(BaseImageRepository):
         img_id = self._h5.attrs["next_id"]
         grp = self._images_grp.create_group(str(img_id))
 
-        self._image_id_to_filepath[img_id] = filepath
+        self._image_id_to_filepath[int(img_id)] = filepath
         self._filepath_to_image_id[filepath] = img_id
         grp.attrs["filepath"] = filepath
 
@@ -76,7 +76,7 @@ class H5ImageRepository(BaseImageRepository):
         image_id = self._filepath_to_image_id.get(filepath)
         return image_id
 
-    def get_filepath(self, img_id: int) -> str | None:
+    def get_filepath(self, img_id: int | np.int64) -> str | None:
         grp = self._images_grp.get(str(img_id))
         if grp is None:
             return None
