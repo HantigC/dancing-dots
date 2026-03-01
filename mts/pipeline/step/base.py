@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from functools import wraps
-from typing import Any, Callable
+from typing import Any, Callable, Hashable
 
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
@@ -86,6 +86,27 @@ def use_params(fn: Callable[..., Any] = None, *, params: list[str] | None = None
         return outer_wrapper(fn)
     else:
         return outer_wrapper
+
+
+class StateKeyError(Exception):
+    pass
+
+
+class State:
+
+    def __init__(self) -> None:
+        self._state_map: dict[Hashable, Any] = {}
+
+    def add(self, key: Hashable, value: Any) -> None:
+        self._state_map[key] = value
+
+    def at(self, key: Hashable) -> Any:
+        try:
+            value = self._state_map[key]
+        except KeyError as e:
+            raise StateKeyError(f"key `{key}` cannot be found in state") from e
+        else:
+            return value
 
 
 def run_pipeline(

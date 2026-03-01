@@ -1,6 +1,7 @@
-
-from enum import Enum
 from dataclasses import dataclass
+from enum import Enum
+
+import numpy as np
 
 
 @dataclass
@@ -16,6 +17,7 @@ class Image:
 class MatchKind(Enum):
     MATCHED = "Matched"
     MERGED = "Merged"
+
 
 @dataclass
 class TwoViewEdge:

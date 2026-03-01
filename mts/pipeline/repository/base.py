@@ -308,7 +308,7 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
-    def add_pairs(self, pairs: list[PairType]) -> None:
+    def add_pairs(self, pairs: list[PairType[int]]) -> None:
         """Stores image ID pairs.
 
         Args:

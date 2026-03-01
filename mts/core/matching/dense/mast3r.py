@@ -9,7 +9,7 @@ from mast3r.fast_nn import extract_correspondences_nonsym
 from mast3r.model import AsymmetricMASt3R
 from tqdm.auto import tqdm
 
-from mts.core.matcher.dense.merge.round import merge_matches
+from mts.core.matching.dense.merge.round import merge_matches
 from mts.core.model.mast3r.transform import transform_keypoints_to_original
 from mts.core.types import PairType
 

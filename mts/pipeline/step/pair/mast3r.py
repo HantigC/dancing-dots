@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import logging
+from typing import Any, NamedTuple
 
+import numpy as np
 import torch
 from mast3r.image_pairs import make_pairs
 from mast3r.retrieval.processor import Retriever
 
 from mts.core.model.mast3r.io import load_model
+from mts.core.pair.model import DistancePair
+from mts.core.scene_graph.nx import mst_from_distance_matrix
 from mts.core.types import PairType, PathLike
+from mts.pipeline.repository.base import BaseImageRepository
 from mts.pipeline.repository.inmemeory import ImageId, ImageRepository
 from mts.pipeline.step.base import BasePipelineStep, use_image_repository
+from mts.utils.pair import from_distance_matrix
 
 LOGGER = logging.getLogger(__name__)
 
@@ -64,6 +70,109 @@ class Mast3rParer(BasePipelineStep):
             )
         )
         return pairs
+
+    @classmethod
+    def from_checkpoints(
+        cls,
+        model_checkpoint: PathLike,
+        retrieval_checkpoint: PathLike,
+        scene_graph: str, 
+    ) -> Mast3rParer:
+        mast3r_model = load_model(model_checkpoint, torch.device("cpu"))
+        retriever = Retriever(
+            retrieval_checkpoint,
+            backbone=mast3r_model,
+            device=torch.device("cpu"),
+        )
+        return cls(retriever, scene_graph)
+
+
+class MstPairTriple(NamedTuple):
+    mst_pairs: list[PairType[int]]
+    possible_pairs: list[PairType[int]]
+    filepaths_to_id_map: dict[str, int]
+
+
+class Mast3rDistanceParer(BasePipelineStep):
+    def __init__(
+        self,
+        retriever: Retriever,
+    ) -> None:
+        super().__init__()
+        self.retriever = retriever
+
+    def run(
+        self,
+        *,
+        image_repository: BaseImageRepository,
+        input: Any = None,
+        state: dict[str, Any] = None,
+    ) -> Any:
+        LOGGER.info("Compute pairs...")
+        pairs = self._compute_pairs(image_repository)
+        image_repository.add_pairs(pairs.possible_pairs)
+        state["starting_pairs"] = pairs.mst_pairs
+
+    @property
+    def device(self):
+        return self.retriever.device
+
+    def to(self, device=None, **kwargs):
+        self.retriever.model.to(device, **kwargs)
+        self.retriever.device = device
+
+    def _compute_distance_matrix(self, filepaths_as_str: list[str]) -> np.ndarray:
+        LOGGER.info("Computing distance matrix...")
+
+        with torch.no_grad():
+            similarity_matrix = self.retriever(filepaths_as_str)
+
+            distance_matrix = 1 - similarity_matrix
+            distance_matrix = (distance_matrix - distance_matrix.min()) / (
+                distance_matrix.max() - distance_matrix.min()
+            )
+        return distance_matrix
+
+    def _extract_starting_pairs(
+        self,
+        distance_matrix: np.ndarray,
+        filepaths_as_str_to_ids_map: dict[str, int],
+    ) -> list[PairType[int]]:
+        mst = mst_from_distance_matrix(
+            distance_matrix,
+            list(filepaths_as_str_to_ids_map),
+        )
+
+        mst_pairs = []
+        for st_node, nd_node in mst.edges:
+            st_node, nd_node = sorted((st_node, nd_node))
+            mst_pairs.append(
+                (
+                    filepaths_as_str_to_ids_map[st_node],
+                    filepaths_as_str_to_ids_map[nd_node],
+                )
+            )
+        return mst_pairs
+
+    def _compute_pairs(
+        self, image_repository: BaseImageRepository
+    ) -> MstPairTriple:
+        filepaths_as_str_to_ids_map = {
+            str(image_repository.get_filepath(image_id)): image_id
+            for image_id in image_repository.image_ids()
+        }
+        filepaths_as_str = list(filepaths_as_str_to_ids_map)
+
+        distance_matrix = self._compute_distance_matrix(filepaths_as_str)
+        mst_pairs = self._extract_starting_pairs(
+            distance_matrix,
+            filepaths_as_str_to_ids_map,
+        )
+
+        possible_pairs = from_distance_matrix(distance_matrix)
+
+        return filepaths_as_str_to_ids_map, mst_pairs, possible_pairs
+
 
     @classmethod
     def from_checkpoints(
