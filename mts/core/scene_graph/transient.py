@@ -70,11 +70,12 @@ def grow_from_pairs(
                     count = nums(scene_graph)
 
                     LOGGER.info(
-                        "merge new edge (%s, %s) via `%s`; count %d;",
+                        "merge new edge (%s, %s) via `%s`; (matched, merged) = (%d, %d);",
                         node_from,
                         node_to,
                         via,
-                        count,
+                        count[MatchKind.MATCHED.value],
+                        count[MatchKind.MERGED.value],
                     )
                     merged = True
                     break

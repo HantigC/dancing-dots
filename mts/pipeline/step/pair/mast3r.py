@@ -170,16 +170,17 @@ class Mast3rDistanceParer(BasePipelineStep):
         )
 
         possible_pairs = from_distance_matrix(distance_matrix)
-
-        return filepaths_as_str_to_ids_map, mst_pairs, possible_pairs
-
+        return MstPairTriple(
+            mst_pairs,
+            possible_pairs,
+            filepaths_as_str_to_ids_map,
+        )
 
     @classmethod
     def from_checkpoints(
         cls,
         model_checkpoint: PathLike,
         retrieval_checkpoint: PathLike,
-        scene_graph: str, 
     ) -> Mast3rParer:
         mast3r_model = load_model(model_checkpoint, torch.device("cpu"))
         retriever = Retriever(
@@ -187,4 +188,4 @@ class Mast3rDistanceParer(BasePipelineStep):
             backbone=mast3r_model,
             device=torch.device("cpu"),
         )
-        return cls(retriever, scene_graph)
+        return cls(retriever)

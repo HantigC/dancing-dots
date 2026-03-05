@@ -31,7 +31,6 @@ class H5ImageRepository(BaseImageRepository):
         self._matches_grp = self._h5.require_group("matches")
         self._poses_grp = self._h5.require_group("poses")
         self._metadata_grp = self._h5.require_group("metadata")
-        self._pairs_grp = self._h5.require_group("pairs")
 
         if "next_id" not in self._h5.attrs:
             self._h5.attrs["next_id"] = 0
@@ -205,7 +204,7 @@ class H5ImageRepository(BaseImageRepository):
     def get_pairs(self):
         if "pairs" not in self._h5:
             return []
-        return [tuple(row) for row in self._pairs_grp["pairs"][:]]
+        return self._h5["pairs"][:].tolist()
 
     def pair_num(self):
         return len(self._h5["pairs"][:])

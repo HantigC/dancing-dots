@@ -18,7 +18,6 @@ from mts.core.scene_graph.transient import grow_from_pairs
 from mts.core.types import PairType, PathLike
 from mts.pipeline.repository.inmemeory import BaseImageRepository
 from mts.pipeline.step.extract.kp.base import BasePipelineStep
-from mts.pipeline.step.pair.mast3r import Retriever
 
 LOGGER = logging.getLogger(__name__)
 
@@ -27,7 +26,6 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
     def __init__(
         self,
         mast3r_model: AsymmetricMASt3R,
-        retriever: Retriever,
         min_pairs: int = 15,
         match_conf_th: float = 1.001,
         verbose: bool = True,
@@ -83,9 +81,16 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
             image_repository,
             mst_pairs,
         )
+        possible_pairs = [
+            (
+                str(image_repository.get_filepath(st_id)),
+                str(image_repository.get_filepath(nd_id)),
+            )
+            for st_id, nd_id in image_repository.get_pairs()
+        ]
         grow_from_pairs(
             scene_graph,
-            image_repository.get_pairs(),
+            possible_pairs,
             self._match_two_images,
         )
 
@@ -109,7 +114,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         try_second = nd_filepath
 
         if len(matches_map) == 0:
-            return
+            return np.array([]), np.array([])
 
         try:
             matches_mmap = matches_map[try_first]
@@ -118,7 +123,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
             try_first, try_second = try_second, try_first
 
         if len(matches_mmap) == 0:
-            return
+            return np.array([]), np.array([])
 
         matches = matches_mmap[try_second]
         st_kpts, nd_kpts = np.split(matches, 2, axis=1)
@@ -171,13 +176,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
 
     @classmethod
     def from_checkpoint(
-        cls, mast3r_model_checkpoint: PathLike, retrieval_checkpoint: PathLike, **kwargs
+        cls, mast3r_model_checkpoint: PathLike, **kwargs
     ) -> Mast3rMatchPipelineStep:
         mast3r_model = load_model(mast3r_model_checkpoint, torch.device("cpu"))
-
-        retriever = Retriever(
-            retrieval_checkpoint,
-            backbone=mast3r_model,
-            device=torch.device("cpu"),
-        )
-        return cls(mast3r_model, retriever, **kwargs)
+        return cls(mast3r_model, **kwargs)
