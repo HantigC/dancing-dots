@@ -39,10 +39,15 @@ dev = [
     "ipykernel>=7.1.0",
     "pip>=25.3",
 ]
+[tool.uv.extra-build-dependencies]
+asmk = [
+    "setuptools",
+    "faiss-cpu>=1.13.2",
+]
 
 [tool.uv.sources]
 hloc = { git = "https://github.com/cvg/Hierarchical-Localization.git" }
-croco = { path = "deps/wheels/croco-0.1.2-py3-none-any.whl" }
-dust3r = { path = "deps/wheels/dust3r-0.1.0-py3-none-any.whl" }
-mast3r = { path = "deps/wheels/mast3r-0.1.0-py3-none-any.whl" }
-asmk = { path = "deps/wheels/asmk-0.1-cp311-cp311-linux_x86_64.whl" }
+croco = { path = "deps/whls/croco-0.1.2-py3-none-any.whl" }
+dust3r = { path = "deps/whls/dust3r-0.1.0-py3-none-any.whl" }
+mast3r = { path = "deps/whls/mast3r-0.1.0-py3-none-any.whl" }
+asmk = { path = "deps/submodules/asmk" }
