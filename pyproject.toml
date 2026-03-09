@@ -45,6 +45,9 @@ asmk = [
     "faiss-cpu>=1.13.2",
 ]
 
+[tool.setuptools.packages.find]
+exclude = ["*"]
+
 [tool.uv.sources]
 hloc = { git = "https://github.com/cvg/Hierarchical-Localization.git" }
 croco = { path = "deps/whls/croco-0.1.2-py3-none-any.whl" }
