@@ -15,7 +15,7 @@ dependencies = [
     "hloc",
     "hydra-core>=1.3.2",
     "kornia>=0.8.2",
-    "lightglue>=0.0",
+    "lightglue",
     "mast3r",
     "matplotlib>=3.10.7",
     "more-itertools>=10.8.0",
