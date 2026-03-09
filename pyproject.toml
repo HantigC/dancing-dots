@@ -51,4 +51,3 @@ croco = { path = "deps/whls/croco-0.1.2-py3-none-any.whl" }
 dust3r = { path = "deps/whls/dust3r-0.1.0-py3-none-any.whl" }
 mast3r = { path = "deps/whls/mast3r-0.1.0-py3-none-any.whl" }
 asmk = { path = "deps/submodules/asmk" }
-lightglue = { git = "https://github.com/cvg/LightGlue", rev = "746fac2c042e05d1865315b1413419f1c1e7ba55" }
