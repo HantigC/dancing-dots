@@ -72,6 +72,10 @@ class H5ImageRepository(BaseImageRepository):
     def _metadata_grp(self):
         return self._h5.require_group("metadata")
 
+    @property
+    def _store_grp(self):
+        return self._h5.require_group("store")
+
     def _get_file_for_reading(self):
         already_open = self._h5 is not None and self._h5.id.valid
         h5 = self._h5 if already_open else h5py.File(self._h5_path, "r")
@@ -263,6 +267,25 @@ class H5ImageRepository(BaseImageRepository):
             if key not in h5_read["matches"]:
                 return None
             return h5_read["matches"][key][:]
+
+    def store(self, name: str, data: Any):
+        with self:
+            grp = self._store_grp
+            if isinstance(data, np.ndarray):
+                if name in grp:
+                    del grp[name]
+                grp.create_dataset(name, data=data)
+            else:
+                grp.attrs[name] = json.dumps(data)
+
+    def load(self, name: str) -> Any:
+        with self._reading() as h5_read:
+            grp = h5_read.get("store", {})
+            if name in grp:
+                return grp[name][:]
+            if name in grp.attrs:
+                return json.loads(grp.attrs[name])
+            return None
 
     def add_pairs(self, pairs):
         with self:

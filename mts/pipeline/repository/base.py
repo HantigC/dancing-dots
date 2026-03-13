@@ -335,6 +335,29 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
+    def store(self, name: str, data: Any) -> None:
+        """Stores arbitrary data under a name.
+
+        Args:
+            name: Key to store the data under.
+            data: Data to store. Numpy arrays are stored natively;
+                  all other types must be JSON-serializable.
+        """
+        pass
+
+    @abstractmethod
+    def load(self, name: str) -> Any:
+        """Retrieves data previously stored under a name.
+
+        Args:
+            name: The key to retrieve.
+
+        Returns:
+            The stored data, or None if not found.
+        """
+        pass
+
+    @abstractmethod
     def open(self) -> None:
         pass
 
