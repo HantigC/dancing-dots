@@ -187,8 +187,8 @@ class Mast3rDistanceParer(BasePipelineStep):
         )
         possible_pairs = self._extract_possible_pairs(
             distance_matrix,
-            filepaths_as_str,
             filepaths_as_str_to_ids_map,
+            filepaths_as_str,
         )
 
         return MstPairTriple(
