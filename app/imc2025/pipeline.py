@@ -56,31 +56,33 @@ class IMC2025Pipeline:
 
     def run_for(self, dataset_name: str) -> None:
         dataset_samples = self.samples[dataset_name]
+
         image_repository = self.create_repository(dataset_name, self)
-        self._repositories_map[dataset_name] = image_repository
-        pipeline = self.create_pipeline(dataset_name, image_repository)
+        with image_repository:
+            self._repositories_map[dataset_name] = image_repository
+            pipeline = self.create_pipeline(dataset_name, image_repository)
 
-        LOGGER.info("Add `%s` to image_repository", dataset_name)
-        for sample in tqdm(dataset_samples, desc="Add images to repository"):
-            image_repository.add_image(sample.image_filepath)
-        LOGGER.info("Starting the pipeline for `%s`", dataset_name)
+            LOGGER.info("Add `%s` to image_repository", dataset_name)
+            for sample in tqdm(dataset_samples, desc="Add images to repository"):
+                image_repository.add_image(sample.image_filepath)
+            LOGGER.info("Starting the pipeline for `%s`", dataset_name)
 
-        input = None
-        if self.create_pipeline_input is not None:
-            input = self.create_pipeline_input(self, image_repository, dataset_name)
+            input = None
+            if self.create_pipeline_input is not None:
+                input = self.create_pipeline_input(self, image_repository, dataset_name)
 
-        state = {}
-        if self.create_pipeline_state is not None:
-            state = self.create_pipeline_state(self, image_repository, dataset_name)
+            state = {}
+            if self.create_pipeline_state is not None:
+                state = self.create_pipeline_state(self, image_repository, dataset_name)
 
-        run_pipeline(
-            pipeline,
-            image_repository=image_repository,
-            input=input,
-            state=state,
-        )
-        LOGGER.info("Ending the pipeline for `{dataset_name}`")
-        self._collect(image_repository, dataset_samples)
+            run_pipeline(
+                pipeline,
+                image_repository=image_repository,
+                input=input,
+                state=state,
+            )
+            LOGGER.info("Ending the pipeline for `{dataset_name}`")
+            self._collect(image_repository, dataset_samples)
 
     def _collect(
         self,

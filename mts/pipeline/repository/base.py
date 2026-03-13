@@ -335,6 +335,10 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
+    def open(self) -> None:
+        pass
+
+    @abstractmethod
     def close(self) -> None:
         """Releases any resources held by the repository.
 
@@ -342,6 +346,12 @@ class BaseImageRepository(ABC):
         or external resources should close them here.
         """
         pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
 
 
 class RepositoryException(BaseException):
