@@ -9,7 +9,6 @@ from mast3r.image_pairs import make_pairs
 from mast3r.retrieval.processor import Retriever
 
 from mts.core.model.mast3r.io import load_model
-from mts.core.pair.model import DistancePair
 from mts.core.scene_graph.nx import mst_from_distance_matrix
 from mts.core.types import PairType, PathLike
 from mts.pipeline.repository.base import BaseImageRepository
@@ -48,7 +47,9 @@ class Mast3rParer(BasePipelineStep):
     def _compute_pairs(
         self, image_repository: ImageRepository
     ) -> list[PairType[ImageId]]:
-        images_filepaths = [str(image_filepath) for image_filepath in image_repository.image_filepaths()]
+        images_filepaths = [
+            str(image_filepath) for image_filepath in image_repository.image_filepaths()
+        ]
         with torch.no_grad():
             similarity_matrix_np = self.retriever(images_filepaths)
 
@@ -76,7 +77,7 @@ class Mast3rParer(BasePipelineStep):
         cls,
         model_checkpoint: PathLike,
         retrieval_checkpoint: PathLike,
-        scene_graph: str, 
+        scene_graph: str,
     ) -> Mast3rParer:
         mast3r_model = load_model(model_checkpoint, torch.device("cpu"))
         retriever = Retriever(
@@ -145,22 +146,38 @@ class Mast3rDistanceParer(BasePipelineStep):
 
         mst_pairs = []
         for st_node, nd_node in mst.edges:
-            st_node, nd_node = sorted((st_node, nd_node))
-            mst_pairs.append(
+            st_image_id, nd_image_id = sorted(
                 (
                     filepaths_as_str_to_ids_map[st_node],
                     filepaths_as_str_to_ids_map[nd_node],
                 )
             )
+            mst_pairs.append((st_image_id, nd_image_id))
         return mst_pairs
 
-    def _compute_pairs(
-        self, image_repository: BaseImageRepository
-    ) -> MstPairTriple:
+    def _extract_possible_pairs(
+        self,
+        distance_matrix: np.ndarray,
+        filepaths_as_str_to_ids_map: dict[str, int],
+        filepaths_as_str: list[str],
+    ) -> list[PairType[int]]:
+        possible_pairs = []
+        for st_idx, nd_idx in from_distance_matrix(distance_matrix):
+            st_filepath_str = filepaths_as_str[st_idx]
+            nd_filepath_str = filepaths_as_str[nd_idx]
+            st_image_id, nd_image_id = (
+                filepaths_as_str_to_ids_map[st_filepath_str],
+                filepaths_as_str_to_ids_map[nd_filepath_str],
+            )
+            possible_pairs.append((st_image_id, nd_image_id))
+        return possible_pairs
+
+    def _compute_pairs(self, image_repository: BaseImageRepository) -> MstPairTriple:
         filepaths_as_str_to_ids_map = {
             str(image_repository.get_filepath(image_id)): image_id
             for image_id in image_repository.image_ids()
         }
+
         filepaths_as_str = list(filepaths_as_str_to_ids_map)
 
         distance_matrix = self._compute_distance_matrix(filepaths_as_str)
@@ -168,8 +185,12 @@ class Mast3rDistanceParer(BasePipelineStep):
             distance_matrix,
             filepaths_as_str_to_ids_map,
         )
+        possible_pairs = self._extract_possible_pairs(
+            distance_matrix,
+            filepaths_as_str,
+            filepaths_as_str_to_ids_map,
+        )
 
-        possible_pairs = from_distance_matrix(distance_matrix)
         return MstPairTriple(
             mst_pairs,
             possible_pairs,

@@ -266,7 +266,10 @@ class H5ImageRepository(BaseImageRepository):
             key = f"{min(img_id1, img_id2)}_{max(img_id1, img_id2)}"
             if key not in h5_read["matches"]:
                 return None
-            return h5_read["matches"][key][:]
+            matches = h5_read["matches"][key][:]
+            if img_id1 > img_id2:
+                matches = matches[:, ::-1]
+            return matches
 
     def store(self, name: str, data: Any):
         with self:

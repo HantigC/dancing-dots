@@ -20,6 +20,7 @@ def match_densely(
 ) -> None:
     st_kpts, nd_kpts = extract_dense_matches(st_fpath, nd_fpath)
     if len(st_kpts) >= 500:
+        LOGGER.info("Match densely (%s, %s)", st_fpath, nd_fpath,)
         scene_graph.add_edge(
             st_fpath,
             nd_fpath,
@@ -50,8 +51,6 @@ def grow_from_pairs(
             print(f"`{nd_fpath}` not in the graph")
             continue
         merged = False
-        st_fpath, nd_fpath = sorted([st_fpath, nd_fpath])
-
         if not scene_graph.has_edge(st_fpath, nd_fpath):
             for kpts_path in list(
                 nx.all_simple_paths(scene_graph, st_fpath, nd_fpath, cutoff=2)

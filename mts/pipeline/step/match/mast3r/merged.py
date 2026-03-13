@@ -15,7 +15,7 @@ from mts.core.model.mast3r.io import load_model
 from mts.core.scene_graph.model import Image, MatchKind, TwoViewEdge
 from mts.core.scene_graph.nx import extract_matches
 from mts.core.scene_graph.transient import grow_from_pairs
-from mts.core.types import PairType, PathLike
+from mts.core.types import ImageId, PairType, PathLike
 from mts.pipeline.repository.base import BaseImageRepository
 from mts.pipeline.step.extract.kp.base import BasePipelineStep
 
@@ -43,7 +43,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         input: Any = None,
         state: dict[str, Any] = None,
     ) -> Any:
-        starting_pairs: list[PairType[int]] = state["starting_pairs"]
+        starting_pairs: list[PairType[ImageId]] = state["starting_pairs"]
         keypoints_map, matches_map = self._compute_matches(
             image_repository,
             starting_pairs,
@@ -72,7 +72,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
     def _compute_matches(
         self,
         image_repository: BaseImageRepository,
-        mst_pairs: list[PairType[int]],
+        mst_pairs: list[PairType[ImageId]],
     ) -> tuple[
         dict[str, np.ndarray],
         dict[str, dict[str, np.ndarray]],
@@ -134,10 +134,19 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         image_repository: BaseImageRepository,
         mst_pairs: list[PairType[int]],
     ) -> nx.Graph:
-        filepaths_as_str = list(map(str, image_repository.image_filepaths()))
+        image_id_to_num = {}
+        filepaths_as_str = []
+        for num, image_id in enumerate(image_repository.image_ids()):
+            image_id_to_num[image_id] = num
+            filepaths_as_str.append(str(image_repository.get_filepath(image_id)))
+
+        mst_paris_indices = [
+            (image_id_to_num[st_image_id], image_id_to_num[nd_image_id])
+            for st_image_id, nd_image_id in mst_pairs
+        ]
         matches_map = extract_dense_keypoints(
             self.mast3r_model,
-            mst_pairs,
+            mst_paris_indices,
             filepaths_as_str,
             device=self.device,
         )
