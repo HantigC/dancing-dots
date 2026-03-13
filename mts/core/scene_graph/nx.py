@@ -139,3 +139,4 @@ def extract_matches(
             axis=1,
         )
         matches_dict.setdefault(img1, {})[img2] = matches
+    return matches_dict

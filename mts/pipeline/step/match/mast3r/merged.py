@@ -16,7 +16,7 @@ from mts.core.scene_graph.model import Image, MatchKind, TwoViewEdge
 from mts.core.scene_graph.nx import extract_matches
 from mts.core.scene_graph.transient import grow_from_pairs
 from mts.core.types import PairType, PathLike
-from mts.pipeline.repository.inmemeory import BaseImageRepository
+from mts.pipeline.repository.base import BaseImageRepository
 from mts.pipeline.step.extract.kp.base import BasePipelineStep
 
 LOGGER = logging.getLogger(__name__)
