@@ -10,8 +10,8 @@ from mts.core.geometry.rigid3d import Rigid3D
 from mts.core.types import StateType
 from mts.helpers.colmap.database import COLMAPDatabase
 from mts.helpers.colmap.h5_to_db import CameraModel
+from mts.pipeline.repository.base import AlreadyExistsException, BaseImageRepository
 from mts.pipeline.repository.export.colmap import export_to_colmap
-from mts.pipeline.repository.inmemeory import AlreadyExistsException, ImageRepository
 from mts.pipeline.step.base import BasePipelineStep, use_image_repository
 
 LOGGER = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ class BaseColmapReconstructionStep(BasePipelineStep, ABC):
     def run(
         self,
         *,
-        image_repository: ImageRepository,
+        image_repository: BaseImageRepository,
         state: StateType,
     ) -> None:
         colmap_dirpath = Path(state["colmap_dirpath"])
@@ -57,13 +57,13 @@ class BaseColmapReconstructionStep(BasePipelineStep, ABC):
     def _run_colmap(
         self,
         *,
-        image_repository: ImageRepository,
+        image_repository: BaseImageRepository,
         input: Any | None = None,
         state: StateType | None = None,
     ) -> dict[int, pycolmap.Reconstruction]:
         pass
 
-    def _save_save_to_repository(self, maps, image_repository: ImageRepository):
+    def _save_save_to_repository(self, maps, image_repository: BaseImageRepository):
         for map_index, cur_map in maps.items():
             for index, image in cur_map.images.items():
                 rigid3d = image.cam_from_world()

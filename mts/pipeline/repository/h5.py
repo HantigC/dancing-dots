@@ -195,13 +195,11 @@ class H5ImageRepository(BaseImageRepository):
             metadata_grp = h5_read["metadata"][str(image_id)]
             return {json.loads(metadata_grp[k]) for k in args}
 
-    def add_pose(self, image_id: int, pose: Rigid3D, force: bool = True):
+    def add_pose(self, image_id: int, pose: Rigid3D) -> None:
         with self:
             rigid_grp = self._poses_grp.get(str(image_id))
             if rigid_grp is None:
                 rigid_grp = self._poses_grp.create_group(str(image_id))
-            elif not force:
-                return
 
             rigid_grp.attrs["rotation"] = pose.rotation
             rigid_grp.attrs["translation"] = pose.translation
@@ -211,7 +209,7 @@ class H5ImageRepository(BaseImageRepository):
             if str(image_id) not in h5_read["poses"]:
                 return None
             pose_grp = h5_read["poses"][str(image_id)]
-            return Rigid3D(pose_grp["rotation"], pose_grp["translation"])
+            return Rigid3D(pose_grp.attrs["rotation"], pose_grp.attrs["translation"])
 
     def add_keypoints(self, img_id: int, keypoints: np.ndarray):
         with self:
