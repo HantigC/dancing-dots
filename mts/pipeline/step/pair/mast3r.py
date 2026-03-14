@@ -111,7 +111,13 @@ class Mast3rDistanceParer(BasePipelineStep):
     ) -> Any:
         LOGGER.info("Compute pairs...")
         pairs = self._compute_pairs(image_repository)
+        LOGGER.info("Write possible pairs to repository...")
         image_repository.add_pairs(pairs.possible_pairs)
+
+        LOGGER.info("Write starting pairs to repository...")
+        image_repository.store("starting_pairs", pairs.possible_pairs)
+
+        LOGGER.info("Add starting pairs to state...")
         state["starting_pairs"] = pairs.mst_pairs
 
     @property
