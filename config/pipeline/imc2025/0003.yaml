@@ -33,5 +33,5 @@ pipeline_steps:
 
 reconstruction_runner:
   create_pipeline_method: app.imc2025.pipeline.create_pipeline
-  create_repository_method: app.imc2025.pipeline.create_repository
+  create_repository_method: app.imc2025.pipeline.create_h5_repository
   create_pipeline_state_method: app.imc2025.pipeline.create_pipeline_state
