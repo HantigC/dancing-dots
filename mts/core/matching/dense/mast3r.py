@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import Any
 
 import cv2
 import numpy as np
@@ -21,14 +22,20 @@ def extract_dense_keypoints(
     min_pairs: int = 15,
     match_conf_th: float = 1.001,
     device: str | torch.device = None,
+    tqdm_kwargs: dict[str, Any] = None,
 ) -> tuple[
     dict[str, np.ndarray],
     dict[tuple[str, str], np.ndarray],
 ]:
     unique_keypoints = defaultdict(list)
     out_match = defaultdict(dict)
+    tqdm_kwargs = tqdm_kwargs or {}
 
-    for idx1, idx2 in tqdm(index_pairs, desc="Computing the matches using Mast3r"):
+    for idx1, idx2 in tqdm(
+        index_pairs,
+        desc="Computing the matches using Mast3r",
+        **tqdm_kwargs,
+    ):
         name1, name2 = image_list[idx1], image_list[idx2]
         key1, key2 = name1, name2
 

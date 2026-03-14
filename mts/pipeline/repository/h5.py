@@ -259,6 +259,9 @@ class H5ImageRepository(BaseImageRepository):
             key = f"{min(img_id1, img_id2)}_{max(img_id1, img_id2)}"
             if key in self._matches_grp:
                 del self._matches_grp[key]
+
+            if img_id1 > img_id2:
+                matches = matches[:, ::-1]
             self._matches_grp.create_dataset(key, data=matches)
 
     def get_matches(self, img_id1: int, img_id2: int):
@@ -314,6 +317,13 @@ class H5ImageRepository(BaseImageRepository):
 
     def close(self):
         self._h5.close()
+
+    def clone(self, dest: PathLike) -> H5ImageRepository:
+        import shutil
+
+        dest = Path(dest)
+        shutil.copy2(self._h5_path, dest)
+        return H5ImageRepository(dest)
 
     @classmethod
     def from_filename(cls, dirpath: PathLike, filename: str) -> H5ImageRepository:

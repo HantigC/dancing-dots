@@ -26,14 +26,10 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
     def __init__(
         self,
         mast3r_model: AsymmetricMASt3R,
-        min_pairs: int = 15,
-        match_conf_th: float = 1.001,
         verbose: bool = True,
     ) -> None:
         super().__init__()
         self.mast3r_model = mast3r_model
-        self.min_pairs = min_pairs
-        self.match_conf_th = match_conf_th
         self.verbose = verbose
 
     def run(
@@ -54,21 +50,6 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
             image_repository,
         )
 
-    def _save_matches_and_kpts(
-        self,
-        keypoints_map,
-        matches_map,
-        image_repository,
-    ) -> None:
-        for image_filepath, keypoints in keypoints_map.items():
-            image_id = image_repository.get_image_id(Path(image_filepath))
-            image_repository.add_keypoints(image_id, keypoints)
-
-        for (st_image_filepath, nd_image_filepath), matches in matches_map.items():
-            st_image_id = image_repository.get_image_id(Path(st_image_filepath))
-            nd_image_id = image_repository.get_image_id(Path(nd_image_filepath))
-            image_repository.add_matches(st_image_id, nd_image_id, matches)
-
     def _compute_matches(
         self,
         image_repository: BaseImageRepository,
@@ -77,6 +58,16 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         dict[str, np.ndarray],
         dict[str, dict[str, np.ndarray]],
     ]:
+        scene_graph = self._create_graph(image_repository, mst_pairs)
+        matches_dict = extract_matches(scene_graph)
+        global_keypoints, global_matches = merge_matches(matches_dict)
+        return global_keypoints, global_matches
+
+    def _create_graph(
+        self,
+        image_repository: BaseImageRepository,
+        mst_pairs: list[PairType[ImageId]],
+    ) -> nx.Graph:
         scene_graph = self._init_graph_from_mst(
             image_repository,
             mst_pairs,
@@ -93,11 +84,23 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
             possible_pairs,
             self._match_two_images,
         )
+        return scene_graph
 
-        matches_dict = extract_matches(scene_graph)
+    def _save_matches_and_kpts(
+        self,
+        keypoints_map: dict[str, np.ndarray],
+        matches_map: dict[tuple[str, str], np.ndarray],
+        image_repository: BaseImageRepository,
+    ) -> None:
+        for image_filepath, keypoints in keypoints_map.items():
+            image_id = image_repository.get_image_id(Path(image_filepath))
+            image_repository.add_keypoints(image_id, keypoints)
 
-        global_keypoints, global_matches = merge_matches(matches_dict)
-        return global_keypoints, global_matches
+        for (st_image_filepath, nd_image_filepath), matches in matches_map.items():
+            st_image_id = image_repository.get_image_id(Path(st_image_filepath))
+            nd_image_id = image_repository.get_image_id(Path(nd_image_filepath))
+            image_repository.add_matches(st_image_id, nd_image_id, matches)
+
 
     def _match_two_images(
         self,
@@ -109,6 +112,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
             [(0, 1)],
             [st_filepath, nd_filepath],
             device=self.device,
+            tqdm_kwargs=dict(disable=True),
         )
         try_first = st_filepath
         try_second = nd_filepath
