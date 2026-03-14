@@ -90,7 +90,7 @@ class IMC2025Pipeline:
         dataset_samples: list[Prediction],
     ) -> None:
         filename_to_prediction = {
-            prediction.image_filepath: prediction for prediction in dataset_samples
+            str(prediction.image_filepath): prediction for prediction in dataset_samples
         }
         how_many_clusters = 0
         for image_id in repository.image_ids():
