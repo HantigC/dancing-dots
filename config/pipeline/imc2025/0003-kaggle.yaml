@@ -13,7 +13,7 @@ pipeline_steps:
     _target_: mts.pipeline.step.base.OnDeviceRunner
     device: cuda:0
     step:
-      _target_: mts.pipeline.step.pair.mast3r.Mast3rParer.from_checkpoints
+      _target_: mts.pipeline.step.pair.mast3r.Mast3rDistanceParer.from_checkpoints
       model_checkpoint: "checkpoints/mast3r/pytorch/default/1/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
       retrieval_checkpoint: "checkpoints/mast3r/pytorch/default/1/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric_retrieval_trainingfree.pth"
       scene_graph: retrieval-20-40
