@@ -5,6 +5,7 @@ description: |
   Use Merged mast3r matcher
 
 project_path: iterations
+data_dirpath: "data/image-matching-challenge-2025"
 is_train: True
 
 pipeline_steps:
