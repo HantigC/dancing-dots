@@ -122,9 +122,13 @@ def create_h5_repository(
     imc2025_pipeline: IMC2025Pipeline,
 ) -> h5_repo.H5ImageRepository:
     dataset_filepath = (
-        imc2025_pipeline.project_dirpath / "h5_repositories" / dataset_name
+        imc2025_pipeline.project_dirpath / "h5_repositories" 
     )
-    image_repository = h5_repo.H5ImageRepository(dataset_filepath)
+    dataset_filepath.mkdir(exist_ok=True)
+    image_repository = h5_repo.H5ImageRepository.from_filename(
+        dataset_filepath,
+        f"{dataset_name}.h5",
+    )
     image_repository.add_repository_metadata(dataset_name=dataset_name)
     return image_repository
 
