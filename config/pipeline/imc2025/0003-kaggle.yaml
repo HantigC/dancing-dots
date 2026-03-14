@@ -1,12 +1,38 @@
-defaults:
-  - 0003
+name: IMC2025
+description: |
+  Use mast3r par3r for pair creation
+  Use minimum spanning tree to get the initial starting pairs
+  Use Merged mast3r matcher
+
+project_path: iterations
+data_dirpath: "data/image-matching-challenge-2025"
+is_train: True
 
 pipeline_steps:
   paring:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
     step:
+      _target_: mts.pipeline.step.pair.mast3r.Mast3rParer.from_checkpoints
       model_checkpoint: "checkpoints/mast3r/pytorch/default/1/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
       retrieval_checkpoint: "checkpoints/mast3r/pytorch/default/1/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric_retrieval_trainingfree.pth"
+      scene_graph: retrieval-20-40
 
   kp_matching:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
     step:
+      _target_: mts.pipeline.step.match.mast3r.merged.Mast3rMatchPipelineStep.from_checkpoint
       mast3r_model_checkpoint: "checkpoints/mast3r/pytorch/default/1/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
+
+  reconstruction:
+    _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep
+    mapper_options:
+      _target_: mts.helpers.colmap.options.create_incremental_pipeline_options
+      min_model_size: 3
+      max_num_models: 25
+
+reconstruction_runner:
+  create_pipeline_method: app.imc2025.pipeline.create_pipeline
+  create_repository_method: app.imc2025.pipeline.create_h5_repository
+  create_pipeline_state_method: app.imc2025.pipeline.create_pipeline_state
