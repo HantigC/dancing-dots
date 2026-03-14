@@ -1,0 +1,12 @@
+defaults:
+  - 0003
+
+pipeline_steps:
+  paring:
+    step:
+      model_checkpoint: "checkpoints/mast3r/pytorch/default/1/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
+      retrieval_checkpoint: "checkpoints/mast3r/pytorch/default/1/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric_retrieval_trainingfree.pth"
+
+  kp_matching:
+    step:
+      mast3r_model_checkpoint: "checkpoints/mast3r/pytorch/default/1/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
