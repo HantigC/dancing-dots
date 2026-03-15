@@ -161,7 +161,8 @@ class H5ImageRepository(BaseImageRepository):
             grp = self._metadata_grp.require_group(str(image_id))
             for k, v in kwargs.items():
                 if k in grp.attrs:
-                    raise ValueError(f"metadata `{k}` already exists")
+                    LOGGER.warning("metadata `%s` already exists for image_id `%d`", k, image_id)
+                    LOGGER.debug("updating `%s` with %s", k, str(v))
                 grp.attrs[k] = json.dumps(v)
 
     def update_metadata(self, image_id: int, **kwargs):
