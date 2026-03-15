@@ -12,14 +12,17 @@ from app.imc2025.pipeline import ALL, IMC2025Pipeline
 from app.imc2025.prediction import load_from_csv, sample_to_csv
 from mts.core.types import PathLike
 from mts.helpers.imc import metric
-from mts.helpers.project.project import Project
+from mts.helpers.project.git_project import GitProject
 from mts.utils.git import get_git_commit
 
 LOGGER = logging.getLogger(__name__)
 
 
 def create_imc2025_from_cfg(cfg):
-    last_project_iteration = Project.from_next_iteration(cfg.project_path)
+    last_project_iteration = GitProject.from_next_iteration(
+        cfg.project_path,
+        create=False,
+    )
     create_pipeline = get_method(cfg.reconstruction_runner.create_pipeline_method)
     create_repository = get_method(cfg.reconstruction_runner.create_repository_method)
     create_pipeline_state = get_method(
@@ -38,48 +41,49 @@ def create_imc2025_from_cfg(cfg):
         create_pipeline_state=create_pipeline_state,
     )
     cfg.origin = imc2025_pipeline.project_dirpath
-    return imc2025_pipeline
+    return imc2025_pipeline, last_project_iteration
 
 
 def run_from_cfg(cfg) -> IMC2025Pipeline:
-    imc2025_pipeline = create_imc2025_from_cfg(cfg)
-    LOGGER.info(
-        "Saving the config `%s` to path: `%s`",
-        str(cfg.origin),
-        str(imc2025_pipeline.project_dirpath),
-    )
-    cfg.git_commit = get_git_commit()
-    OmegaConf.save(cfg, imc2025_pipeline.project_dirpath / "config.yaml")
-    datasets_names = cfg.get("datasets_names")
-    if datasets_names is not None:
-        datasets_names = list(datasets_names)
-    else:
-        datasets_names = ALL
-    imc2025_pipeline.run(datasets_names)
-    is_train = cfg.get("is_train", True)
-
-    submission_filepath = imc2025_pipeline.project_dirpath / "submission.csv"
-    sample_to_csv(imc2025_pipeline.samples, submission_filepath)
-    data_dirpath = Path(cfg.data_dirpath)
-
-    if is_train:
-        summary_dict = metric.score(
-            gt_csv=data_dirpath / "train_labels.csv",
-            user_csv=submission_filepath,
-            thresholds_csv=data_dirpath / "train_thresholds.csv",
-            mask_csv=None if is_train else data_dirpath / "mask.csv",
-            inl_cf=0,
-            strict_cf=-1,
-            verbose=True,
+    imc2025_pipeline, last_project_iteration = create_imc2025_from_cfg(cfg)
+    with last_project_iteration:
+        LOGGER.info(
+            "Saving the config `%s` to path: `%s`",
+            str(cfg.origin),
+            str(imc2025_pipeline.project_dirpath),
         )
-        with open(
-            imc2025_pipeline.project_dirpath / "summary.json", "w"
-        ) as summary_file:
-            json.dump(
-                summary_dict,
-                summary_file,
-                indent=4,
+        cfg.git_commit = get_git_commit()
+        OmegaConf.save(cfg, imc2025_pipeline.project_dirpath / "config.yaml")
+        datasets_names = cfg.get("datasets_names")
+        if datasets_names is not None:
+            datasets_names = list(datasets_names)
+        else:
+            datasets_names = ALL
+        imc2025_pipeline.run(datasets_names)
+        is_train = cfg.get("is_train", True)
+
+        submission_filepath = imc2025_pipeline.project_dirpath / "submission.csv"
+        sample_to_csv(imc2025_pipeline.samples, submission_filepath)
+        data_dirpath = Path(cfg.data_dirpath)
+
+        if is_train:
+            summary_dict = metric.score(
+                gt_csv=data_dirpath / "train_labels.csv",
+                user_csv=submission_filepath,
+                thresholds_csv=data_dirpath / "train_thresholds.csv",
+                mask_csv=None if is_train else data_dirpath / "mask.csv",
+                inl_cf=0,
+                strict_cf=-1,
+                verbose=True,
             )
+            with open(
+                imc2025_pipeline.project_dirpath / "summary.json", "w"
+            ) as summary_file:
+                json.dump(
+                    summary_dict,
+                    summary_file,
+                    indent=4,
+                )
 
     return imc2025_pipeline
 
