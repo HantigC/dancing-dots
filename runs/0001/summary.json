@@ -1,0 +1,37 @@
+{
+    "final_score": 6.604809838554128,
+    "final_score_mask_a": 6.604809838554128,
+    "final_score_mask_b": 0.0,
+    "scene_score_dict": {
+        "imc2023_haiper": 68.31866825208085,
+        "imc2023_heritage": 0.0,
+        "imc2023_theather_imc2024_church": 0.0,
+        "imc2024_dioscuri_baalshamin": 0.0,
+        "imc2024_lizard_pond": 0.0,
+        "pt_brandenburg_british_buckingham": 0.0,
+        "pt_piazzasanmarco_grandplace": 0.0,
+        "pt_sacrecoeur_trevi_tajmahal": 0.0,
+        "pt_stpeters_stpauls": 0.0,
+        "amy_gardens": 0.0,
+        "fbk_vineyard": 0.0,
+        "ETs": 17.543859649122805,
+        "stairs": 0.0
+    },
+    "scene_score_dict_mask_a": null,
+    "scene_score_dict_mask_b": null,
+    "scene_clusterness_dict": {
+        "imc2023_haiper": 63.52941176470588,
+        "imc2023_heritage": 100.0,
+        "imc2023_theather_imc2024_church": 100.0,
+        "imc2024_dioscuri_baalshamin": 100.0,
+        "imc2024_lizard_pond": 100.0,
+        "pt_brandenburg_british_buckingham": 100.0,
+        "pt_piazzasanmarco_grandplace": 100.0,
+        "pt_sacrecoeur_trevi_tajmahal": 100.0,
+        "pt_stpeters_stpauls": 100.0,
+        "amy_gardens": 100.0,
+        "fbk_vineyard": 100.0,
+        "ETs": 100.0,
+        "stairs": 100.0
+    }
+}
