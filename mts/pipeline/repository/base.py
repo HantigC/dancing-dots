@@ -162,7 +162,7 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
-    def get_metadata(self, image_id: ImageId) -> dict[str, Any]:
+    def get_metadata(self, image_id: ImageId) -> dict[str, Any] | None:
         """Retrieves all metadata for a specific image.
 
         Args:

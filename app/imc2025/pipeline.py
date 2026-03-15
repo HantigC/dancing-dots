@@ -94,8 +94,10 @@ class IMC2025Pipeline:
         }
         how_many_clusters = 0
         for image_id in repository.image_ids():
-            metadata: dict[str, str] = repository.get_metadata(image_id)
-            cluster_index = metadata.get("cluster")
+            metadata: dict[str, str] | None = repository.get_metadata(image_id)
+            cluster_index = None
+            if metadata is not None:
+                cluster_index = metadata.get("cluster")
             pose = repository.get_pose(image_id)
             prediction = filename_to_prediction[repository.get_filepath(image_id)]
             if pose is not None:

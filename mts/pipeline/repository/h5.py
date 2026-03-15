@@ -184,9 +184,11 @@ class H5ImageRepository(BaseImageRepository):
                 if name in metadata.attrs:
                     del metadata.attrs[name]
 
-    def get_metadata(self, image_id: ImageId) -> dict[str, Any]:
+    def get_metadata(self, image_id: ImageId) -> dict[str, Any] | None:
         with self._reading() as h5_read:
-            grp = h5_read["metadata"][str(image_id)]
+            grp = h5_read["metadata"].get(str(image_id))
+            if grp is None:
+                return None
             attribute_dict = {k: json.loads(v) for k, v in grp.attrs.items()}
         return attribute_dict
 
