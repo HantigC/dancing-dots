@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from mts.core.types import PairType
+from mts.core.types import DistancedTriple, PairType
 from mts.helpers.torch.tensor import from_np, to_2d
 
 
@@ -22,9 +22,9 @@ def compute_cross_pairs(
 
     num_embeddings = len(image_embeddings)
     ar = np.arange(num_embeddings)
-    matching_list: list[PairType] = []
 
-    for st_idx in range(num_embeddings - 1):
+    matching_dict: dict[PairType[int], DistancedTriple] = {}
+    for st_idx in range(num_embeddings):
         mask_idx = mask[st_idx]
         to_match = ar[mask_idx]
         if len(to_match) < min_pairs:
@@ -33,7 +33,8 @@ def compute_cross_pairs(
             if st_idx == idx:
                 continue
             if dm[st_idx, idx] < distance_th:
-                matching_list.append(tuple(sorted((st_idx, idx.item()))))
+                st, nd = sorted((st_idx, idx.item()))
+                matching_dict[st, nd] = DistancedTriple(st, nd, dm[st_idx, idx])
 
-    matching_list = sorted(list(set(matching_list)))
+    matching_list = sorted(list(matching_dict.values()))
     return matching_list
