@@ -8,6 +8,7 @@ from hydra.utils import get_method
 from omegaconf import OmegaConf
 
 from app.constants import DEBUG
+from config.logging import setup_file
 from app.imc2025.pipeline import ALL, IMC2025Pipeline
 from app.imc2025.prediction import load_from_csv, sample_to_csv
 from mts.core.types import PathLike
@@ -22,6 +23,8 @@ def create_imc2025_from_cfg(cfg):
     last_project_iteration = GitProject.from_next_iteration(
         cfg.project_path,
         create=False,
+        save=cfg.save_project_to_git
+
     )
     create_pipeline = get_method(cfg.reconstruction_runner.create_pipeline_method)
     create_repository = get_method(cfg.reconstruction_runner.create_repository_method)
@@ -46,6 +49,7 @@ def create_imc2025_from_cfg(cfg):
 
 def run_from_cfg(cfg) -> IMC2025Pipeline:
     imc2025_pipeline, last_project_iteration = create_imc2025_from_cfg(cfg)
+    setup_file(cfg.get("environment", DEBUG), imc2025_pipeline.project_dirpath)
     with last_project_iteration:
         LOGGER.info(
             "Saving the config `%s` to path: `%s`",
@@ -94,7 +98,7 @@ def run_from_config_filepath(hydra_config_filepath: PathLike) -> IMC2025Pipeline
 
 
 def main(environment: str = DEBUG):
-    from app import setup_from_env
+    from app.setup import setup_from_env
 
     setup_from_env((environment))
     PIPELINE_CONFIG = os.environ.get("PIPELINE_CONFIG")

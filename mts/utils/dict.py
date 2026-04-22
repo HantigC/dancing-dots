@@ -10,7 +10,9 @@ def extract_kwargs(
         if isinstance(names, str):
             names = [names]
         else:
-            raise ValueError(f"What dict should be of type list[str] | str, not {names.__class__.name}")
+            raise ValueError(
+                f"What dict should be of type list[str] | str, not {names.__class__.name}"
+            )
 
     what_dict: dict[str, dict[str, Any]] = {w: {} for w in names}
     left_dict = {}

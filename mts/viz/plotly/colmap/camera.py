@@ -15,3 +15,4 @@ def render_camera_axes(fig: go.Figure, image: pycolmap.Image, **kwargs) -> go.Fi
     position = image.cam_from_world.inverse().matrix() @ [0, 0, 0, 1]
     xaxis, yaxis, zaxis = image.cam_from_world.rotation.matrix()
     return _render_axes(fig, position, xaxis, yaxis, zaxis, **kwargs)
+

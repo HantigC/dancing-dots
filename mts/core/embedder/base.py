@@ -29,3 +29,15 @@ def extract_embeddings(
             embeddings.append(embedding.cpu())
 
     return embeddings
+
+
+def extract_embeddings_from_images(
+    embedder: BaseEmbedder,
+    images: list[np.ndarray],
+) -> list[np.ndarray]:
+    results = []
+    with torch.no_grad():
+        for image in tqdm(images):
+            embedding = embedder.embed_image(image)
+            results.append(embedding.cpu())
+    return results

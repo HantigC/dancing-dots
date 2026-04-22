@@ -1,0 +1,11 @@
+defaults:
+    - base          # inherit base config
+    - _self_        # this file's keys override
+
+pipeline_steps:
+  paring:
+    device: mps
+
+  kp_matching: 
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: mps

@@ -6,6 +6,7 @@ import numpy as np
 from mts.core.matching.utils.merging import match_kpts
 from mts.core.matching.utils.validation import validate_kps_matches
 from mts.core.scene_graph.model import MatchKind, TwoViewEdge
+from mts.core.types import DistancedTriple
 
 
 def graph_from_distance_matrix(
@@ -38,6 +39,40 @@ def mst_from_distance_matrix(
         distance_matrix,
         labels,
         threshold,
+    )
+
+    mst = nx.minimum_spanning_tree(distance_graph, weight="weight")
+    return mst
+
+
+def graph_from_distanced_triple(
+    triples: list[DistancedTriple],
+    labels: list[str],
+    upper_threshold: float,
+) -> nx.Graph:
+
+    G = nx.Graph()
+
+    G.add_nodes_from(labels)
+    for distanced_triple in triples:
+        if distanced_triple.distance <= upper_threshold:
+            G.add_edge(
+                labels[distanced_triple.st],
+                labels[distanced_triple.nd],
+                weight=distanced_triple.distance,
+            )
+    return G
+
+
+def mst_pair_distanced_triple(
+    triples: list[DistancedTriple],
+    labels: list[str],
+    upper_threshold: float,
+) -> nx.Graph:
+    distance_graph = graph_from_distanced_triple(
+        triples,
+        labels,
+        upper_threshold,
     )
 
     mst = nx.minimum_spanning_tree(distance_graph, weight="weight")
@@ -127,8 +162,9 @@ def nums(scene_graph: nx.Graph) -> Counter:
 
 def extract_matches(
     scene_graph: nx.Graph,
-) -> dict[str, dict[str, np.ndarray]]:
+) -> tuple[dict[str, dict[str, np.ndarray]], dict[tuple[str, str], MatchKind]]:
     matches_dict = {}
+    match_kinds = {}
     for (img1, img2), edge_data in scene_graph.edges.items():
         two_view: TwoViewEdge = edge_data["two_view"]
         matches = np.concatenate(
@@ -139,4 +175,5 @@ def extract_matches(
             axis=1,
         )
         matches_dict.setdefault(img1, {})[img2] = matches
-    return matches_dict
+        match_kinds[(img1, img2)] = two_view.match_kind
+    return matches_dict, match_kinds

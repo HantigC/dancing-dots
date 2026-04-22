@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import networkx as nx
 import numpy as np
@@ -13,24 +13,34 @@ from mts.core.matching.dense.mast3r import extract_dense_keypoints
 from mts.core.matching.dense.merge.round import merge_matches
 from mts.core.model.mast3r.io import load_model
 from mts.core.scene_graph.model import Image, MatchKind, TwoViewEdge
+from mts.pipeline.repository.base import AlreadyExistsException
 from mts.core.scene_graph.nx import extract_matches
-from mts.core.scene_graph.transient import grow_from_pairs
 from mts.core.types import ImageId, PairType, PathLike
 from mts.pipeline.repository.base import BaseImageRepository
 from mts.pipeline.step.extract.kp.base import BasePipelineStep
 
 LOGGER = logging.getLogger(__name__)
+GrowCallable = Callable[
+    [
+        nx.Graph,
+        list[tuple[str, str]],
+        Callable[[str, str], np.ndarray],
+    ],
+    None,
+]
 
 
 class Mast3rMatchPipelineStep(BasePipelineStep):
     def __init__(
         self,
         mast3r_model: AsymmetricMASt3R,
+        grow_graph: GrowCallable,
         verbose: bool = True,
     ) -> None:
         super().__init__()
         self.mast3r_model = mast3r_model
         self.verbose = verbose
+        self.grow_graph = grow_graph
 
     def run(
         self,
@@ -40,13 +50,14 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         state: dict[str, Any] = None,
     ) -> Any:
         starting_pairs: list[PairType[ImageId]] = state["starting_pairs"]
-        keypoints_map, matches_map = self._compute_matches(
+        keypoints_map, matches_map, match_kind_map = self._compute_matches(
             image_repository,
             starting_pairs,
         )
         self._save_matches_and_kpts(
             keypoints_map,
             matches_map,
+            match_kind_map,
             image_repository,
         )
 
@@ -56,12 +67,13 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         mst_pairs: list[PairType[ImageId]],
     ) -> tuple[
         dict[str, np.ndarray],
-        dict[str, dict[str, np.ndarray]],
+        dict[tuple[str, str], np.ndarray],
+        dict[tuple[str, str], MatchKind],
     ]:
         scene_graph = self._create_graph(image_repository, mst_pairs)
-        matches_dict = extract_matches(scene_graph)
+        matches_dict, match_kind_map = extract_matches(scene_graph)
         global_keypoints, global_matches = merge_matches(matches_dict)
-        return global_keypoints, global_matches
+        return global_keypoints, global_matches, match_kind_map
 
     def _create_graph(
         self,
@@ -79,7 +91,8 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
             )
             for st_id, nd_id in image_repository.get_pairs()
         ]
-        grow_from_pairs(
+
+        self.grow_graph(
             scene_graph,
             possible_pairs,
             self._match_two_images,
@@ -90,17 +103,36 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         self,
         keypoints_map: dict[str, np.ndarray],
         matches_map: dict[tuple[str, str], np.ndarray],
+        match_kind_map: dict[tuple[str, str], MatchKind],
         image_repository: BaseImageRepository,
     ) -> None:
+        image_match_kinds: dict[str, MatchKind] = {}
+        for (img1, img2), kind in match_kind_map.items():
+            if kind == MatchKind.MERGED:
+                image_match_kinds[img1] = MatchKind.MERGED
+                image_match_kinds[img2] = MatchKind.MERGED
+            else:
+                image_match_kinds.setdefault(img1, MatchKind.MATCHED)
+                image_match_kinds.setdefault(img2, MatchKind.MATCHED)
+
         for image_filepath, keypoints in keypoints_map.items():
             image_id = image_repository.get_image_id(Path(image_filepath))
             image_repository.add_keypoints(image_id, keypoints)
+            match_kind = image_match_kinds.get(image_filepath)
+            if match_kind is not None:
+                try:
+                    image_repository.add_metadata(
+                        image_id, match_kind=match_kind.value
+                    )
+                except AlreadyExistsException:
+                    image_repository.update_metadata(
+                        image_id, match_kind=match_kind.value
+                    )
 
         for (st_image_filepath, nd_image_filepath), matches in matches_map.items():
             st_image_id = image_repository.get_image_id(Path(st_image_filepath))
             nd_image_id = image_repository.get_image_id(Path(nd_image_filepath))
             image_repository.add_matches(st_image_id, nd_image_id, matches)
-
 
     def _match_two_images(
         self,
@@ -189,7 +221,11 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
 
     @classmethod
     def from_checkpoint(
-        cls, mast3r_model_checkpoint: PathLike, **kwargs
+        cls, mast3r_model_checkpoint: PathLike, grow_graph: GrowCallable, **kwargs
     ) -> Mast3rMatchPipelineStep:
         mast3r_model = load_model(mast3r_model_checkpoint, torch.device("cpu"))
-        return cls(mast3r_model, **kwargs)
+        return cls(
+            mast3r_model,
+            grow_graph,
+            **kwargs,
+        )

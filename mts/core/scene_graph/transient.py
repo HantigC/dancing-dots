@@ -38,7 +38,27 @@ def match_densely(
         )
 
 
-def grow_from_pairs(
+def grow_densely(
+    scene_graph: nx.Graph,
+    pairs: list[tuple[str, str]],
+    extract_dense_matches: Callable[[str, str], np.ndarray],
+) -> None:
+    for st_fpath, nd_fpath in tqdm(pairs):
+        if not scene_graph.has_node(st_fpath):
+            print(f"`{st_fpath}` not in the graph")
+            continue
+        if not scene_graph.has_node(nd_fpath):
+            print(f"`{nd_fpath}` not in the graph")
+            continue
+        match_densely(
+            st_fpath,
+            nd_fpath,
+            scene_graph,
+            extract_dense_matches,
+        )
+
+
+def grow_merging(
     scene_graph: nx.Graph,
     pairs: list[tuple[str, str]],
     extract_dense_matches: Callable[[str, str], np.ndarray],

@@ -1,0 +1,15 @@
+defaults:
+    - base          # inherit base config
+    - _self_        # this file's keys override
+
+pipeline_steps:
+  paring:
+    device: mps
+
+  kp_matching: 
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    step:
+      _target_: mts.pipeline.step.match.mast3r.merged.Mast3rMatchPipelineStep.from_checkpoint
+      grow_graph: 
+        _target_: mts.core.scene_graph.transient.grow_merging
+        _partial_: true

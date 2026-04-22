@@ -75,8 +75,14 @@ class BaseColmapReconstructionStep(BasePipelineStep, ABC):
                         deepcopy(rigid3d.translation),
                     ),
                 )
+                existing_metadata = image_repository.get_metadata(image_id) or {}
+                match_kind = existing_metadata.get("match_kind")
                 try:
-                    image_repository.add_metadata(image_id, cluster=map_index)
+                    image_repository.add_metadata(
+                        image_id, cluster=map_index, match_kind=match_kind
+                    )
                 except AlreadyExistsException:
                     LOGGER.warning("`%d` already has 'cluster' metadata", image_id)
-                    image_repository.update_metadata(image_id, cluster=map_index)
+                    image_repository.update_metadata(
+                        image_id, cluster=map_index, match_kind=match_kind
+                    )

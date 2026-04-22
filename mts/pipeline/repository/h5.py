@@ -10,7 +10,7 @@ import h5py
 import numpy as np
 
 from mts.core.geometry.rigid3d import Rigid3D
-from mts.core.types import ImageId, PathLike
+from mts.core.types import ImageId, PairType, PathLike
 from mts.utils.image import imread_rgb
 
 from .base import BaseImageRepository
@@ -103,6 +103,13 @@ class H5ImageRepository(BaseImageRepository):
         else:
             self._h5.close()
 
+    def get_repository_metadata(self, name: str):
+        with self._reading() as h5_read:
+            value = h5_read["repository_metadata"].attrs.get(name)
+            if value is not None:
+                value = json.loads(value)
+        return value
+
     def add_repository_metadata(self, **kwargs):
         with self:
             for k, v in kwargs.items():
@@ -150,7 +157,7 @@ class H5ImageRepository(BaseImageRepository):
     def iterate_over_images(self) -> Generator[tuple[ImageId, np.ndarray], None, None]:
         with self._reading() as h5_read:
             for image_id in h5_read["images"]:
-                yield image_id, self.load_image(image_id)
+                yield int(image_id), self.load_image(image_id)
 
     def load_image(self, image_id: ImageId) -> np.ndarray:
         with self._reading() as h5_read:
@@ -161,7 +168,9 @@ class H5ImageRepository(BaseImageRepository):
             grp = self._metadata_grp.require_group(str(image_id))
             for k, v in kwargs.items():
                 if k in grp.attrs:
-                    LOGGER.warning("metadata `%s` already exists for image_id `%d`", k, image_id)
+                    LOGGER.warning(
+                        "metadata `%s` already exists for image_id `%d`", k, image_id
+                    )
                     LOGGER.debug("updating `%s` with %s", k, str(v))
                 grp.attrs[k] = json.dumps(v)
 
@@ -189,7 +198,7 @@ class H5ImageRepository(BaseImageRepository):
         with self._reading() as h5_read:
             grp = h5_read["metadata"].get(str(image_id))
             if grp is None:
-                return None
+                return {}
             attribute_dict = {k: json.loads(v) for k, v in grp.attrs.items()}
         return attribute_dict
 
@@ -274,6 +283,20 @@ class H5ImageRepository(BaseImageRepository):
             if img_id1 > img_id2:
                 matches = matches[:, ::-1]
             return matches
+
+    def iterate_over_matches(
+        self,
+    ) -> Generator[
+        tuple[PairType[int], np.ndarray],
+        None,
+        None,
+    ]:
+        with self._reading() as h_reading:
+            matches = h_reading["matches"]
+            for pair_id, match in matches.items():
+                st_image_id, nd_image_id = pair_id.split("_")
+                st_image_id, nd_image_id = int(st_image_id), int(nd_image_id)
+                yield (st_image_id, nd_image_id), match[:]
 
     def store(self, name: str, data: Any):
         with self:

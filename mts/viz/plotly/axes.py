@@ -1,10 +1,13 @@
 import itertools as it
+from typing import Any
 
 import numpy as np
-from plotly import graph_objects as go
 
+from mts.core.geometry.rigid3d import Rigid3D
+from mts.core.geometry.vector import normalize
 from mts.utils.dict import extract_kwargs
-
+from mts.viz.plotly.figure import create_new_figure
+from plotly import graph_objects as go
 
 
 def render_axes(
@@ -14,19 +17,36 @@ def render_axes(
     yaxis,
     zaxis,
     scale=1,
-    **kwargs,
+    axes_kwargs: dict[str, Any] | None = None,
 ):
-    named_kwargs = extract_kwargs(kwargs, ["xaxis", "yaxis", "zaxis"], merge=True)
+    if axes_kwargs is None:
+        axes_kwargs = {}
+    named_kwargs = extract_kwargs(
+        axes_kwargs, ["xaxis", "yaxis", "zaxis", "rig"], merge=True
+    )
     xaxis_kwargs = named_kwargs["xaxis"]
     yaxis_kwargs = named_kwargs["yaxis"]
     zaxis_kwargs = named_kwargs["zaxis"]
+    rig_kwargs = named_kwargs["rig"]
     xaxis_kwargs.setdefault("color", "rgb(255, 0, 0)")
     yaxis_kwargs.setdefault("color", "rgb(0, 255, 0)")
     zaxis_kwargs.setdefault("color", "rgb(0, 0, 255)")
+    rig_kwargs.setdefault("color", "rgb(0, 255, 255)")
 
     xaxis_kwargs.setdefault("name", "xaxis")
     yaxis_kwargs.setdefault("name", "yaxis")
     zaxis_kwargs.setdefault("name", "zaxis")
+    rig_kwargs.setdefault("name", "rig")
+    fig.add_trace(
+        go.Scatter3d(
+            x=[position[0]],
+            y=[position[1]],
+            z=[position[2]],
+            name=rig_kwargs["name"],
+            showlegend=False,
+            marker=dict(color=rig_kwargs["color"]),
+        )
+    )
 
     fig.add_trace(
         go.Scatter3d(
@@ -62,6 +82,24 @@ def render_axes(
         )
     )
     return fig
+
+
+@create_new_figure
+def render_rigid3d(
+    pose: Rigid3D,
+    scale: float = 1,
+    fig: go.Figure = None,
+    **kwargs,
+) -> go.Figure:
+    return render_axes(
+        fig,
+        position=pose.translation,
+        xaxis=pose.rotation[:, 0],
+        yaxis=pose.rotation[:, 1],
+        zaxis=pose.rotation[:, 2],
+        scale=scale,
+        **kwargs,
+    )
 
 
 def render_od_rays(
@@ -101,11 +139,7 @@ def render_diff_rays(
     row=None,
     col=None,
 ) -> go.Figure:
-    directions = normalize(
-        points - origin,
-        axis=1,
-        keepdims=True,
-    )
+    directions = normalize(points - origin, axis=1)
     return render_od_rays(
         fig,
         origin,

@@ -24,9 +24,11 @@ class GitProject(BaseProject):
         remote: str = "origin",
         branch: str = "main",
         create: bool = True,
+        save: bool = True,
     ) -> None:
         self.remote = remote
         self.branch = branch
+        self.save = save
         self._check_in_sync()
         super().__init__(project_dir, iteration_name, create=create)
 
@@ -62,6 +64,10 @@ class GitProject(BaseProject):
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         if exc_type is not None:
             return
+
+        if not self.save:
+            return
+
         subprocess.run(
             ["git", "add", str(self.iteration_dirpath)],
             check=True,
