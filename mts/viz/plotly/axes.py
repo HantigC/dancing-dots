@@ -10,14 +10,15 @@ from mts.viz.plotly.figure import create_new_figure
 from plotly import graph_objects as go
 
 
+@create_new_figure
 def render_axes(
-    fig,
     position,
     xaxis,
     yaxis,
     zaxis,
     scale=1,
     axes_kwargs: dict[str, Any] | None = None,
+    fig: go.Figure | None = None,
 ):
     if axes_kwargs is None:
         axes_kwargs = {}
@@ -92,12 +93,12 @@ def render_rigid3d(
     **kwargs,
 ) -> go.Figure:
     return render_axes(
-        fig,
         position=pose.translation,
         xaxis=pose.rotation[:, 0],
         yaxis=pose.rotation[:, 1],
         zaxis=pose.rotation[:, 2],
         scale=scale,
+        fig=fig,
         **kwargs,
     )
 

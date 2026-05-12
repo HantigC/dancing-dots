@@ -20,3 +20,4 @@ class DistancedTriple(NamedTuple):
 class Rigid3dDict(TypedDict):
     R: np.ndarray
     t: np.ndarray
+

@@ -779,14 +779,24 @@ def score(
             for dataset, score in zip(gt_data, stat_score_mask_a)
         }
     )
-    scene_score_dict_mask_b = (
-        None
-        if mask_csv is None
-        else {
+
+    scene_score_dict_mask_b = {
             dataset: float(score * 100)
             for dataset, score in zip(gt_data, stat_score_mask_b)
+    }
+
+    scene_mAA_dict_mask_a = {
+            dataset: float(score * 100)
+            for dataset, score in zip(gt_data, stat_mAA_mask_a)
         }
-    )
+    scene_mAA_dict_mask_b = {
+            dataset: float(score * 100)
+            for dataset, score in zip(gt_data, stat_mAA_mask_b)
+        }
+    scene_mAA_dict = {
+            dataset: float(score * 100)
+            for dataset, score in zip(gt_data, stat_mAA)
+        }
 
     return {
         "final_score": float(final_score),
@@ -796,4 +806,7 @@ def score(
         "scene_score_dict_mask_a": scene_score_dict_mask_a, 
         "scene_score_dict_mask_b": scene_score_dict_mask_b,
         "scene_clusterness_dict": scene_clusterness_dict,
+        "scene_mAA_dict_mask_a": scene_mAA_dict_mask_a,
+        "scene_mAA_dict_mask_b": scene_mAA_dict_mask_b,
+        "scene_mAA_dict": scene_mAA_dict,
     }

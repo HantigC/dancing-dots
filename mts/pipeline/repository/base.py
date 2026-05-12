@@ -308,6 +308,30 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
+    def add_match_metadata(
+        self, img_id1: ImageId, img_id2: ImageId, **kwargs
+    ) -> None:
+        pass
+
+    @abstractmethod
+    def update_match_metadata(
+        self, img_id1: ImageId, img_id2: ImageId, **kwargs
+    ) -> None:
+        pass
+
+    @abstractmethod
+    def upsert_match_metadata(
+        self, img_id1: ImageId, img_id2: ImageId, **kwargs
+    ) -> None:
+        pass
+
+    @abstractmethod
+    def get_match_metadata(
+        self, img_id1: ImageId, img_id2: ImageId
+    ) -> dict[str, Any] | None:
+        pass
+
+    @abstractmethod
     def add_pairs(self, pairs: list[PairType[int]]) -> None:
         """Stores image ID pairs.
 

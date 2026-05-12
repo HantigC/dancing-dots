@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 from typing import Any
 
@@ -14,6 +15,8 @@ from mts.core.matching.dense.merge.round import merge_matches
 from mts.core.model.mast3r.transform import transform_keypoints_to_original
 from mts.core.types import PairType
 
+LOGGER = logging.getLogger(__name__)
+
 
 def extract_dense_keypoints(
     mast3r_model: AsymmetricMASt3R,
@@ -23,6 +26,7 @@ def extract_dense_keypoints(
     match_conf_th: float = 1.001,
     device: str | torch.device = None,
     tqdm_kwargs: dict[str, Any] = None,
+    batch_size: int = 1,
 ) -> tuple[
     dict[str, np.ndarray],
     dict[tuple[str, str], np.ndarray],
@@ -30,6 +34,7 @@ def extract_dense_keypoints(
     unique_keypoints = defaultdict(list)
     out_match = defaultdict(dict)
     tqdm_kwargs = tqdm_kwargs or {}
+    
 
     for idx1, idx2 in tqdm(
         index_pairs,
@@ -42,7 +47,7 @@ def extract_dense_keypoints(
         # Only re-run inference for key1 if not in cache
         images = load_images([name1, name2], size=512, verbose=False)
         output = inference(
-            [tuple(images)], mast3r_model, device, batch_size=1, verbose=False
+            [tuple(images)], mast3r_model, device, batch_size=batch_size, verbose=False
         )
 
         # at this stage, you have the raw dust3r predictions
@@ -61,9 +66,15 @@ def extract_dense_keypoints(
             pred1["desc_conf"].squeeze(0).detach(),
             pred2["desc_conf"].squeeze(0).detach(),
         )
-        corres = extract_correspondences_nonsym(
-            desc1, desc2, conf1, conf2, device=device, subsample=8, pixel_tol=5
-        )
+        try:
+            corres = extract_correspondences_nonsym(
+                desc1, desc2, conf1, conf2, device=device, subsample=8, pixel_tol=5
+            )
+        except ValueError as e:
+            if "index -1 is out of bounds for array with size " in e:
+                LOGGER.exception("Something happened when extracting the matches")
+                continue
+            raise e
         score = corres[2]
         mask = score >= match_conf_th
         matches_im0 = corres[0][mask].cpu().numpy()
@@ -112,7 +123,6 @@ def extract_dense_keypoints(
             [matches_im0_org, matches_im1_org], axis=1
         )
     return out_match
-
 
 
 def match_pairs(

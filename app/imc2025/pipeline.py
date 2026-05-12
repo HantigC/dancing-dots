@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -51,11 +52,15 @@ class IMC2025Pipeline:
         datasets_names: list[str] | str = ALL,
     ):
         datasets_names = self._get_dataset_names(datasets_names)
+        t0 = time.monotonic()
         for dataset_name in datasets_names:
             self.run_for(dataset_name)
+        elapsed = time.monotonic() - t0
+        LOGGER.info("Pipeline finished in %.2f seconds (%.2f minutes)", elapsed, elapsed / 60)
 
     def run_for(self, dataset_name: str) -> None:
         dataset_samples = self.samples[dataset_name]
+        t0 = time.monotonic()
 
         image_repository = self.create_repository(dataset_name, self)
         with image_repository:
@@ -81,8 +86,9 @@ class IMC2025Pipeline:
                 input=input,
                 state=state,
             )
-            LOGGER.info("Ending the pipeline for `{dataset_name}`")
             self._collect(image_repository, dataset_samples)
+        elapsed = time.monotonic() - t0
+        LOGGER.info("`%s` finished in %.2f seconds (%.2f minutes)", dataset_name, elapsed, elapsed / 60)
 
     def _collect(
         self,

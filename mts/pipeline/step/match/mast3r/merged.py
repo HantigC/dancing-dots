@@ -13,7 +13,6 @@ from mts.core.matching.dense.mast3r import extract_dense_keypoints
 from mts.core.matching.dense.merge.round import merge_matches
 from mts.core.model.mast3r.io import load_model
 from mts.core.scene_graph.model import Image, MatchKind, TwoViewEdge
-from mts.pipeline.repository.base import AlreadyExistsException
 from mts.core.scene_graph.nx import extract_matches
 from mts.core.types import ImageId, PairType, PathLike
 from mts.pipeline.repository.base import BaseImageRepository
@@ -106,46 +105,40 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         match_kind_map: dict[tuple[str, str], MatchKind],
         image_repository: BaseImageRepository,
     ) -> None:
-        image_match_kinds: dict[str, MatchKind] = {}
-        for (img1, img2), kind in match_kind_map.items():
-            if kind == MatchKind.MERGED:
-                image_match_kinds[img1] = MatchKind.MERGED
-                image_match_kinds[img2] = MatchKind.MERGED
-            else:
-                image_match_kinds.setdefault(img1, MatchKind.MATCHED)
-                image_match_kinds.setdefault(img2, MatchKind.MATCHED)
-
         for image_filepath, keypoints in keypoints_map.items():
             image_id = image_repository.get_image_id(Path(image_filepath))
             image_repository.add_keypoints(image_id, keypoints)
-            match_kind = image_match_kinds.get(image_filepath)
-            if match_kind is not None:
-                try:
-                    image_repository.add_metadata(
-                        image_id, match_kind=match_kind.value
-                    )
-                except AlreadyExistsException:
-                    image_repository.update_metadata(
-                        image_id, match_kind=match_kind.value
-                    )
 
         for (st_image_filepath, nd_image_filepath), matches in matches_map.items():
             st_image_id = image_repository.get_image_id(Path(st_image_filepath))
             nd_image_id = image_repository.get_image_id(Path(nd_image_filepath))
             image_repository.add_matches(st_image_id, nd_image_id, matches)
+            kind = match_kind_map.get(
+                (st_image_filepath, nd_image_filepath)
+            )
+            if kind is not None:
+                image_repository.upsert_match_metadata(
+                    st_image_id, nd_image_id, match_kind=kind.value
+                )
 
     def _match_two_images(
         self,
         st_filepath: str,
         nd_filepath: str,
     ) -> tuple[np.ndarray, np.ndarray]:
-        matches_map = extract_dense_keypoints(
-            self.mast3r_model,
-            [(0, 1)],
-            [st_filepath, nd_filepath],
-            device=self.device,
-            tqdm_kwargs=dict(disable=True),
-        )
+
+        try:
+            matches_map = extract_dense_keypoints(
+                self.mast3r_model,
+                [(0, 1)],
+                [st_filepath, nd_filepath],
+                device=self.device,
+                tqdm_kwargs=dict(disable=True),
+            )
+        except ValueError:
+            LOGGER.exception("Trouble with extracting the dense keypoints")
+            matches_map = {}
+
         try_first = st_filepath
         try_second = nd_filepath
 
@@ -185,6 +178,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
             mst_paris_indices,
             filepaths_as_str,
             device=self.device,
+            batch_size=1,
         )
 
         scene_graph = nx.Graph().to_undirected()

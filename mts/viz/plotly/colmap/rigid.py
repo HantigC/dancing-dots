@@ -18,11 +18,11 @@ def render_axes(
     position = rigid3d.inverse().translation
     rotation = rigid3d.rotation.matrix()
     return axes.render_axes(
-        fig,
         position=position,
         xaxis=rotation[0],
         yaxis=rotation[1],
         zaxis=rotation[2],
         scale=scale,
+        fig=fig,
         axes_kwargs=axes_kwargs,
     )

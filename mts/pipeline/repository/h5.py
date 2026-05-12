@@ -37,6 +37,10 @@ class H5ImageRepository(BaseImageRepository):
                 self._image_id_to_filepath[int(image_id)] = filepath
                 self._filepath_to_image_id[filepath] = int(image_id)
 
+    @staticmethod
+    def _pair_key(img_id1: int, img_id2: int) -> str:
+        return f"{min(img_id1, img_id2)}_{max(img_id1, img_id2)}"
+
     def open(self):
         self._open()
 
@@ -47,6 +51,14 @@ class H5ImageRepository(BaseImageRepository):
             self._h5.attrs["next_id"] = 0
 
         self._next_id = self._h5.attrs["next_id"]
+        # self._h5.require_group("repository_metadata")
+        # self._h5.require_group("images")
+        # self._h5.require_group("features")
+        # self._h5.require_group("matches")
+        # self._h5.require_group("matches_metadata")
+        # self._h5.require_group("poses")
+        # self._h5.require_group("metadata")
+        # self._h5.require_group("store")
 
     @property
     def _repo_meta(self):
@@ -71,6 +83,10 @@ class H5ImageRepository(BaseImageRepository):
     @property
     def _metadata_grp(self):
         return self._h5.require_group("metadata")
+
+    @property
+    def _matches_metadata_grp(self):
+        return self._h5.require_group("matches_metadata")
 
     @property
     def _store_grp(self):
@@ -196,7 +212,7 @@ class H5ImageRepository(BaseImageRepository):
 
     def get_metadata(self, image_id: ImageId) -> dict[str, Any] | None:
         with self._reading() as h5_read:
-            grp = h5_read["metadata"].get(str(image_id))
+            grp = h5_read.get("metadata", {}).get(str(image_id))
             if grp is None:
                 return {}
             attribute_dict = {k: json.loads(v) for k, v in grp.attrs.items()}
@@ -264,9 +280,46 @@ class H5ImageRepository(BaseImageRepository):
                 return None
             return grp["global_descriptor"][:]
 
+    def add_match_metadata(self, img_id1: int, img_id2: int, **kwargs):
+        with self:
+            key = self._pair_key(img_id1, img_id2)
+            grp = self._matches_metadata_grp.require_group(key)
+            for k, v in kwargs.items():
+                if k in grp.attrs:
+                    raise ValueError(
+                        f"match metadata `{k}` already exists for pair ({img_id1}, {img_id2})"
+                    )
+                grp.attrs[k] = json.dumps(v)
+
+    def update_match_metadata(self, img_id1: int, img_id2: int, **kwargs):
+        with self:
+            key = self._pair_key(img_id1, img_id2)
+            grp = self._matches_metadata_grp.require_group(key)
+            for k, v in kwargs.items():
+                if k not in grp.attrs:
+                    raise ValueError(
+                        f"match metadata `{k}` does not exist for pair ({img_id1}, {img_id2})"
+                    )
+                grp.attrs[k] = json.dumps(v)
+
+    def upsert_match_metadata(self, img_id1: int, img_id2: int, **kwargs):
+        with self:
+            key = self._pair_key(img_id1, img_id2)
+            grp = self._matches_metadata_grp.require_group(key)
+            for k, v in kwargs.items():
+                grp.attrs[k] = json.dumps(v)
+
+    def get_match_metadata(self, img_id1: int, img_id2: int) -> dict | None:
+        with self._reading() as h5_read:
+            key = self._pair_key(img_id1, img_id2)
+            grp = h5_read.get("matches_metadata", {}).get(key)
+            if grp is None:
+                return {}
+            return {k: json.loads(v) for k, v in grp.attrs.items()}
+
     def add_matches(self, img_id1: int, img_id2: int, matches: np.ndarray):
         with self:
-            key = f"{min(img_id1, img_id2)}_{max(img_id1, img_id2)}"
+            key = self._pair_key(img_id1, img_id2)
             if key in self._matches_grp:
                 del self._matches_grp[key]
 
@@ -276,7 +329,7 @@ class H5ImageRepository(BaseImageRepository):
 
     def get_matches(self, img_id1: int, img_id2: int):
         with self._reading() as h5_read:
-            key = f"{min(img_id1, img_id2)}_{max(img_id1, img_id2)}"
+            key = self._pair_key(img_id1, img_id2)
             if key not in h5_read["matches"]:
                 return None
             matches = h5_read["matches"][key][:]

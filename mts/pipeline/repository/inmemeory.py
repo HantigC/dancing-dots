@@ -28,6 +28,7 @@ class ImageRepository(BaseImageRepository):
 
         # (id1, id2) → matches array
         self._matches = {}
+        self._match_metadata: dict[tuple, dict[str, Any]] = {}
         self._pairs_map = {}
         self._pairs = []
         self._poses: dict[ImageId, Rigid3D] = {}
@@ -143,6 +144,36 @@ class ImageRepository(BaseImageRepository):
     def get_matches(self, img_id1: int, img_id2: int) -> np.ndarray | None:
         key = tuple(sorted((img_id1, img_id2)))
         return self._matches.get(key)
+
+    def add_match_metadata(self, img_id1: int, img_id2: int, **kwargs):
+        key = tuple(sorted((img_id1, img_id2)))
+        pair_meta = self._match_metadata.setdefault(key, {})
+        for k, v in kwargs.items():
+            if k in pair_meta:
+                raise AlreadyExistsException(
+                    f"match metadata `{k}` already exists for pair ({img_id1}, {img_id2})"
+                )
+            pair_meta[k] = v
+
+    def update_match_metadata(self, img_id1: int, img_id2: int, **kwargs):
+        key = tuple(sorted((img_id1, img_id2)))
+        pair_meta = self._match_metadata.setdefault(key, {})
+        for k, v in kwargs.items():
+            if k not in pair_meta:
+                raise NotFoundException(
+                    f"match metadata `{k}` does not exist for pair ({img_id1}, {img_id2})"
+                )
+            pair_meta[k] = v
+
+    def upsert_match_metadata(self, img_id1: int, img_id2: int, **kwargs):
+        key = tuple(sorted((img_id1, img_id2)))
+        pair_meta = self._match_metadata.setdefault(key, {})
+        for k, v in kwargs.items():
+            pair_meta[k] = v
+
+    def get_match_metadata(self, img_id1: int, img_id2: int) -> dict | None:
+        key = tuple(sorted((img_id1, img_id2)))
+        return self._match_metadata.get(key, {})
 
     def add_pairs(self, pairs: list[PairType[ImageId]]) -> None:
         for st_id, nd_id in pairs:
