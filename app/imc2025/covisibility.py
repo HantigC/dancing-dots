@@ -5,7 +5,7 @@ from PIL import Image
 from tqdm.auto import tqdm
 
 from app.imc2025.samples import GTSample
-from mts.core.geometry.covisibility.plane_sweep import particle_sweep_covisibility
+from mts.core.geometry.covisibility.frustum import frustum_intersection_covisibility
 from mts.core.types import Rigid3dDict
 from mts.helpers.colmap.h5_to_db import get_focal
 
@@ -19,8 +19,6 @@ class CovisibilityFn(Protocol):
         nd_rigid3d_dict: Rigid3dDict,
         nd_k: np.ndarray,
         nd_image_size: tuple[int, int],
-        depth_range: tuple[float, float],
-        no_of_depths: int,
         **kwargs,
     ) -> float: ...
 
@@ -57,11 +55,9 @@ def make_pairs(samples: list) -> list[tuple]:
 
 def gt_samples_covisibility(
     samples: list[GTSample],
-    depth_range: tuple[float, float],
-    no_of_depths: int,
     pairs: list[tuple[int, int]] | None = None,
     tqdm_kwargs: dict[str, Any] | None = None,
-    covisibility_fn: CovisibilityFn = particle_sweep_covisibility,
+    covisibility_fn: CovisibilityFn = frustum_intersection_covisibility,
     covisibility_fn_kwargs: dict[str, Any] | None = None,
 ) -> dict[tuple[str, str], float]:
     tqdm_kwargs = {} if tqdm_kwargs is None else tqdm_kwargs
@@ -83,10 +79,8 @@ def gt_samples_covisibility(
             samples[j].gt_pose,
             k_matrices[j],
             image_sizes[j],
-            depth_range,
-            no_of_depths,
             **covisibility_fn_kwargs,
         )
-        result[(samples[i].sample.filename, samples[j].sample.filename)] = score
+        result[i, j] = score
 
     return result

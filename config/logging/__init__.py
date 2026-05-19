@@ -19,14 +19,11 @@ def setup(environment: Environment) -> None:
     logging.config.dictConfig(config)
 
 
-def setup_file(environment: Environment, project_path: PathLike) -> None:
-    setup(environment)
+def setup_file_logging(project_path: PathLike) -> None:
     log_filepath = Path(project_path) / "run.log"
+    # log_filepath.parent.mkdir(parents=True, exist_ok=True)
     file_handler = logging.FileHandler(log_filepath)
-    file_handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     file_handler.setFormatter(formatter)
-    logging.root.addHandler(file_handler)
-    for name in ("mts", "app"):
-        logger = logging.getLogger(name)
+    for logger in (logging.root, logging.getLogger("mts"), logging.getLogger("app")):
         logger.addHandler(file_handler)

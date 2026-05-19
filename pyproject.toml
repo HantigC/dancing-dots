@@ -7,6 +7,7 @@ requires-python = ">=3.11,<3.12"
 dependencies = [
     "asmk",
     "build>=1.4.0",
+    "click>=8.3.3",
     "croco",
     "dust3r",
     "einops>=0.8.1",
@@ -25,9 +26,12 @@ dependencies = [
     "plotly>=6.4.0",
     "py3nvml>=0.2.7",
     "pycolmap>=3.13.0",
+    "shapely>=2.1.2",
     "torch==2.5",
     "tqdm>=4.67.1",
     "transformers>=4.57.1",
+    "trimesh>=4.0.0",
+    "manifold3d>=3.0.0",
 ]
 
 [dependency-groups]
@@ -39,11 +43,17 @@ dev = [
     "ipykernel>=7.1.0",
     "pip>=25.3",
 ]
+[tool.uv]
+package = true
+
 [tool.uv.extra-build-dependencies]
 asmk = [
     "setuptools",
     "faiss-cpu>=1.13.2",
 ]
+
+[project.scripts]
+run-on-mps = "app.imc2025.run.on_mps:main"
 
 [tool.setuptools.packages.find]
 exclude = ["*"]
