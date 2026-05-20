@@ -1,5 +1,5 @@
 [project]
-name = "disertation"
+name = "dancing-dots"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -34,6 +34,11 @@ dependencies = [
     "manifold3d>=3.0.0",
 ]
 
+[project.optional-dependencies]
+kaggle = [
+    "kagglehub>=0.3",
+]
+
 [dependency-groups]
 build = [
     "setuptools>=80.9.0",
@@ -54,9 +59,10 @@ asmk = [
 
 [project.scripts]
 run-on-mps = "app.imc2025.run.on_mps:main"
+upload-to-kaggle = "scripts.upload_to_kaggle:main"
 
 [tool.setuptools.packages.find]
-exclude = ["*"]
+where = ["src"]
 
 [tool.uv.sources]
 hloc = { git = "https://github.com/cvg/Hierarchical-Localization.git" }

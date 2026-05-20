@@ -141,6 +141,18 @@ wheels = [
 ]
 
 [[package]]
+name = "click"
+version = "8.3.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bb/63/f9e1ea081ce35720d8b92acde70daaedace594dc93b693c869e0d5910718/click-8.3.3.tar.gz", hash = "sha256:398329ad4837b2ff7cbe1dd166a4c0f8900c3ca3a218de04466f38f6497f18a2", size = 328061, upload-time = "2026-04-22T15:11:27.506Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ae/44/c1221527f6a71a01ec6fbad7fa78f1d50dfa02217385cf0fa3eec7087d59/click-8.3.3-py3-none-any.whl", hash = "sha256:a2bf429bb3033c89fa4936ffb35d5cb471e3719e1f3c8a7c3fff0b8314305613", size = 110502, upload-time = "2026-04-22T15:11:25.044Z" },
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -225,6 +237,96 @@ wheels = [
 ]
 
 [[package]]
+name = "dancing-dots"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "asmk" },
+    { name = "build" },
+    { name = "click" },
+    { name = "croco" },
+    { name = "dust3r" },
+    { name = "einops" },
+    { name = "faiss-cpu" },
+    { name = "h5py" },
+    { name = "hloc" },
+    { name = "hydra-core" },
+    { name = "kornia" },
+    { name = "lightglue" },
+    { name = "manifold3d" },
+    { name = "mast3r" },
+    { name = "matplotlib" },
+    { name = "more-itertools" },
+    { name = "nbformat" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "plotly" },
+    { name = "py3nvml" },
+    { name = "pycolmap" },
+    { name = "shapely" },
+    { name = "torch" },
+    { name = "tqdm" },
+    { name = "transformers" },
+    { name = "trimesh" },
+]
+
+[package.optional-dependencies]
+kaggle = [
+    { name = "kagglehub" },
+]
+
+[package.dev-dependencies]
+build = [
+    { name = "setuptools" },
+]
+dev = [
+    { name = "cython" },
+    { name = "ipykernel" },
+    { name = "pip" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "asmk", directory = "deps/submodules/asmk" },
+    { name = "build", specifier = ">=1.4.0" },
+    { name = "click", specifier = ">=8.3.3" },
+    { name = "croco", path = "deps/whls/croco-0.1.2-py3-none-any.whl" },
+    { name = "dust3r", path = "deps/whls/dust3r-0.1.0-py3-none-any.whl" },
+    { name = "einops", specifier = ">=0.8.1" },
+    { name = "faiss-cpu", specifier = ">=1.13.2" },
+    { name = "h5py", specifier = "==3.16.0" },
+    { name = "hloc", git = "https://github.com/cvg/Hierarchical-Localization.git" },
+    { name = "hydra-core", specifier = ">=1.3.2" },
+    { name = "kagglehub", marker = "extra == 'kaggle'", specifier = ">=0.3" },
+    { name = "kornia", specifier = ">=0.8.2" },
+    { name = "lightglue" },
+    { name = "manifold3d", specifier = ">=3.0.0" },
+    { name = "mast3r", path = "deps/whls/mast3r-0.1.0-py3-none-any.whl" },
+    { name = "matplotlib", specifier = ">=3.10.7" },
+    { name = "more-itertools", specifier = ">=10.8.0" },
+    { name = "nbformat", specifier = ">=5.10.4" },
+    { name = "numpy", specifier = ">=2.3.4" },
+    { name = "pandas", specifier = ">=2.3.3" },
+    { name = "plotly", specifier = ">=6.4.0" },
+    { name = "py3nvml", specifier = ">=0.2.7" },
+    { name = "pycolmap", specifier = ">=3.13.0" },
+    { name = "shapely", specifier = ">=2.1.2" },
+    { name = "torch", specifier = "==2.5" },
+    { name = "tqdm", specifier = ">=4.67.1" },
+    { name = "transformers", specifier = ">=4.57.1" },
+    { name = "trimesh", specifier = ">=4.0.0" },
+]
+provides-extras = ["kaggle"]
+
+[package.metadata.requires-dev]
+build = [{ name = "setuptools", specifier = ">=80.9.0" }]
+dev = [
+    { name = "cython", specifier = ">=3.2.4" },
+    { name = "ipykernel", specifier = ">=7.1.0" },
+    { name = "pip", specifier = ">=25.3" },
+]
+
+[[package]]
 name = "debugpy"
 version = "1.8.17"
 source = { registry = "https://pypi.org/simple" }
@@ -244,81 +346,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/43/fa/6d96a0978d19e17b68d634497769987b16c8f4cd0a7a05048bec693caa6b/decorator-5.2.1.tar.gz", hash = "sha256:65f266143752f734b0a7cc83c46f4618af75b8c5911b00ccb61d0ac9b6da0360", size = 56711, upload-time = "2025-02-24T04:41:34.073Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4e/8c/f3147f5c4b73e7550fe5f9352eaa956ae838d5c51eb58e7a25b9f3e2643b/decorator-5.2.1-py3-none-any.whl", hash = "sha256:d316bb415a2d9e2d2b3abcc4084c6502fc09240e292cd76a76afc106a1c8e04a", size = 9190, upload-time = "2025-02-24T04:41:32.565Z" },
-]
-
-[[package]]
-name = "disertation"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "asmk" },
-    { name = "build" },
-    { name = "croco" },
-    { name = "dust3r" },
-    { name = "einops" },
-    { name = "faiss-cpu" },
-    { name = "h5py" },
-    { name = "hloc" },
-    { name = "hydra-core" },
-    { name = "kornia" },
-    { name = "lightglue" },
-    { name = "mast3r" },
-    { name = "matplotlib" },
-    { name = "more-itertools" },
-    { name = "nbformat" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "plotly" },
-    { name = "py3nvml" },
-    { name = "pycolmap" },
-    { name = "torch" },
-    { name = "tqdm" },
-    { name = "transformers" },
-]
-
-[package.dev-dependencies]
-build = [
-    { name = "setuptools" },
-]
-dev = [
-    { name = "cython" },
-    { name = "ipykernel" },
-    { name = "pip" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "asmk", directory = "deps/submodules/asmk" },
-    { name = "build", specifier = ">=1.4.0" },
-    { name = "croco", path = "deps/whls/croco-0.1.2-py3-none-any.whl" },
-    { name = "dust3r", path = "deps/whls/dust3r-0.1.0-py3-none-any.whl" },
-    { name = "einops", specifier = ">=0.8.1" },
-    { name = "faiss-cpu", specifier = ">=1.13.2" },
-    { name = "h5py", specifier = ">=3.15.1" },
-    { name = "hloc", git = "https://github.com/cvg/Hierarchical-Localization.git" },
-    { name = "hydra-core", specifier = ">=1.3.2" },
-    { name = "kornia", specifier = ">=0.8.2" },
-    { name = "lightglue" },
-    { name = "mast3r", path = "deps/whls/mast3r-0.1.0-py3-none-any.whl" },
-    { name = "matplotlib", specifier = ">=3.10.7" },
-    { name = "more-itertools", specifier = ">=10.8.0" },
-    { name = "nbformat", specifier = ">=5.10.4" },
-    { name = "numpy", specifier = ">=2.3.4" },
-    { name = "pandas", specifier = ">=2.3.3" },
-    { name = "plotly", specifier = ">=6.4.0" },
-    { name = "py3nvml", specifier = ">=0.2.7" },
-    { name = "pycolmap", specifier = ">=3.13.0" },
-    { name = "torch", specifier = "==2.5" },
-    { name = "tqdm", specifier = ">=4.67.1" },
-    { name = "transformers", specifier = ">=4.57.1" },
-]
-
-[package.metadata.requires-dev]
-build = [{ name = "setuptools", specifier = ">=80.9.0" }]
-dev = [
-    { name = "cython", specifier = ">=3.2.4" },
-    { name = "ipykernel", specifier = ">=7.1.0" },
-    { name = "pip", specifier = ">=25.3" },
 ]
 
 [[package]]
@@ -660,6 +687,35 @@ wheels = [
 ]
 
 [[package]]
+name = "kagglehub"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "kagglesdk" },
+    { name = "packaging" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d9/3c/4d0cef65da767f2ec57a1c1c77e28d91378150652b69e6ceec99798709b5/kagglehub-1.0.1.tar.gz", hash = "sha256:eae33eba423de222cf3993d99f5b33c5ff25f33d9ee8efe64236b479462c3c54", size = 117354, upload-time = "2026-04-28T22:08:47.935Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/70/14/7b1f40778a4c8930f46b5841902647396069ccaa21cb8e0779ee822ffa77/kagglehub-1.0.1-py3-none-any.whl", hash = "sha256:003b7f725cbd64cc852a84fd840cf1e1594c2aa13d72f8090ed6e4e178a65166", size = 70636, upload-time = "2026-04-28T22:08:46.878Z" },
+]
+
+[[package]]
+name = "kagglesdk"
+version = "0.1.23"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "protobuf" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/89/7f/80d1910fbb42d59e5845c16affa8496302a3334360e23d70c2adf492b31c/kagglesdk-0.1.23.tar.gz", hash = "sha256:62e89ae21ae29495e7e597d6160f378efcb0c8734a8c10eaf7f7607a60ac1f25", size = 164193, upload-time = "2026-05-01T15:49:16.666Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8f/4e/fead499e4e76f66203611ecee1032fc8da87f2ab59c3921c76b06334cbbf/kagglesdk-0.1.23-py3-none-any.whl", hash = "sha256:8966f7d99f59f2b769681e19a2cf52192b23be053de6875c06e66cd85c4f1dd1", size = 217784, upload-time = "2026-05-01T15:49:15.291Z" },
+]
+
+[[package]]
 name = "kiwisolver"
 version = "1.4.9"
 source = { registry = "https://pypi.org/simple" }
@@ -723,6 +779,23 @@ dependencies = [
     { name = "opencv-python" },
     { name = "torch" },
     { name = "torchvision" },
+]
+
+[[package]]
+name = "manifold3d"
+version = "3.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b0/fd/4dfc246e076e3912c45a821764f4de8b6c8117fa36fc67f8e44bf9dfe59b/manifold3d-3.4.1.tar.gz", hash = "sha256:b517927e2c15dc52169fff0cd12e1949eceb4ca49f3a5b8c0568b1116a561ab1", size = 269275, upload-time = "2026-03-24T06:22:40.062Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/af/14/42f1d0fbe0dbbaf7abd9ffb83596a84cea7b3d84c40f0c20a3474a23e397/manifold3d-3.4.1-cp311-cp311-macosx_10_14_universal2.whl", hash = "sha256:5b4ba7b71ffd6bf16682acff89cb72ade3eba54ea05d58d956c3a95d982ed8e4", size = 1753383, upload-time = "2026-03-24T06:21:45.602Z" },
+    { url = "https://files.pythonhosted.org/packages/35/47/3d5369c2485c48c2510eab4e803b29296edecbce78c9069995731bff9635/manifold3d-3.4.1-cp311-cp311-macosx_10_14_x86_64.whl", hash = "sha256:095b072e89485f00af8aeed0a88e72c19f9740467824d6653b329851c3928c14", size = 956296, upload-time = "2026-03-24T06:21:47.257Z" },
+    { url = "https://files.pythonhosted.org/packages/75/d4/d01a5579b636e49a106071365f82d0c7a695226cbc6dc077304e51bfc86f/manifold3d-3.4.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:539c2467abc58754b74dc9bb3422ddd4e73a5b11b006f27c0ba6302bab6ecfe9", size = 841995, upload-time = "2026-03-24T06:21:48.529Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/63/32c64efc0a34f23776dc339f8b1cdbcc61b12a80ade261f2e7a358af52d9/manifold3d-3.4.1-cp311-cp311-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:42c0c8ab2495acd514e8f46e5acd9465937c46c8c06e45e2f02da983b849bcea", size = 1252454, upload-time = "2026-03-24T06:21:50.317Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/f2/6c7ec5986bc3cfc9251878ade6e65354538a8bc569c5e51c483aa4310063/manifold3d-3.4.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:aa75de877ccda5482493f65659de240d4bb7c96e3cc4ce96509ecd6ef9f91fbc", size = 1353505, upload-time = "2026-03-24T06:21:52.428Z" },
+    { url = "https://files.pythonhosted.org/packages/94/61/9e8ab3a9ce6e7e6099794afd25abe1e4e7934f31529c55331bf8019bc736/manifold3d-3.4.1-cp311-cp311-win_amd64.whl", hash = "sha256:2aff8707558e2fa5ff241185fe71da18ac8bd4156fb2811401df3366e461c562", size = 983641, upload-time = "2026-03-24T06:21:53.876Z" },
 ]
 
 [[package]]
@@ -1140,6 +1213,21 @@ wheels = [
 ]
 
 [[package]]
+name = "protobuf"
+version = "7.35.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/60/fd/5b1491d9e4b586d621c54f4c36b888714164b6875f8d6afa3f9072906a51/protobuf-7.35.0.tar.gz", hash = "sha256:a2efd84605f41e559f1881b0912b44099d0a2ac9bf46b3474823f10fb393b0e6", size = 458677, upload-time = "2026-05-19T23:02:29.197Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/83/ee/93d06e358a4aa32280b00e722d3ea0a1f25fc3cc5778d80581c9cca2c10e/protobuf-7.35.0-cp310-abi3-macosx_10_9_universal2.whl", hash = "sha256:66be6c513931c794fa92c080ffee41671390da3d79da219cf9c0c0907f035dda", size = 433225, upload-time = "2026-05-19T23:02:19.884Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/39/1c76c2da93f3c507e958e0aecee2391cc44d4625de6c728bbc555195b5a8/protobuf-7.35.0-cp310-abi3-manylinux2014_aarch64.whl", hash = "sha256:fcbe42a4ac09d3ec9c987ddfcd956afd0b15f1ff613bd8371bde9405ffd5c8e5", size = 328847, upload-time = "2026-05-19T23:02:22.3Z" },
+    { url = "https://files.pythonhosted.org/packages/91/1a/39f7ce90a238c1a987a4d81ec26379e02ca0aff367de68e4a1fa474215b9/protobuf-7.35.0-cp310-abi3-manylinux2014_s390x.whl", hash = "sha256:4cbf5cc286130e06a6c9bbefac442431173906dfcc979712183d4adcc01b37ee", size = 344030, upload-time = "2026-05-19T23:02:23.591Z" },
+    { url = "https://files.pythonhosted.org/packages/70/5b/6baf9008817964454055ff3fe65f1de0b5f1e26c80c82f7fb108b7cd4ea3/protobuf-7.35.0-cp310-abi3-manylinux2014_x86_64.whl", hash = "sha256:6c0f98f10c8a05ea30f8993dfef2de093d27b490fdae78bb60c8343795d55011", size = 327130, upload-time = "2026-05-19T23:02:24.637Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/e5/e46adb0badc388bfb84877a5f9f026aff63f60e611016cf64dbe77e05446/protobuf-7.35.0-cp310-abi3-win32.whl", hash = "sha256:4c4617b83ade0e279d1d2bfe04025a1adb87f9ed657de038620dc0ff959357f6", size = 428946, upload-time = "2026-05-19T23:02:25.741Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/ab/547fbd9e16d879dd13c167478f8ae0a83a428008ca07a5e06acdc23ad473/protobuf-7.35.0-cp310-abi3-win_amd64.whl", hash = "sha256:f05bcadf9a2a6b8dda047007075135fb7d08c73d9177aabc067e1be46881a201", size = 439996, upload-time = "2026-05-19T23:02:26.808Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/ef/50433d346c56657a70d27f156c7b349ac59a068b01de4eb796e747eecc43/protobuf-7.35.0-py3-none-any.whl", hash = "sha256:c13f325cf242bad135c350629eeb5d54b24228eb472fb3e2e9ebbd4c5dc20ca0", size = 171659, upload-time = "2026-05-19T23:02:27.842Z" },
+]
+
+[[package]]
 name = "psutil"
 version = "7.1.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1471,6 +1559,25 @@ wheels = [
 ]
 
 [[package]]
+name = "shapely"
+version = "2.1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4d/bc/0989043118a27cccb4e906a46b7565ce36ca7b57f5a18b78f4f1b0f72d9d/shapely-2.1.2.tar.gz", hash = "sha256:2ed4ecb28320a433db18a5bf029986aa8afcfd740745e78847e330d5d94922a9", size = 315489, upload-time = "2025-09-24T13:51:41.432Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8f/8d/1ff672dea9ec6a7b5d422eb6d095ed886e2e523733329f75fdcb14ee1149/shapely-2.1.2-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:91121757b0a36c9aac3427a651a7e6567110a4a67c97edf04f8d55d4765f6618", size = 1820038, upload-time = "2025-09-24T13:50:15.628Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/ce/28fab8c772ce5db23a0d86bf0adaee0c4c79d5ad1db766055fa3dab442e2/shapely-2.1.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:16a9c722ba774cf50b5d4541242b4cce05aafd44a015290c82ba8a16931ff63d", size = 1626039, upload-time = "2025-09-24T13:50:16.881Z" },
+    { url = "https://files.pythonhosted.org/packages/70/8b/868b7e3f4982f5006e9395c1e12343c66a8155c0374fdc07c0e6a1ab547d/shapely-2.1.2-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:cc4f7397459b12c0b196c9efe1f9d7e92463cbba142632b4cc6d8bbbbd3e2b09", size = 3001519, upload-time = "2025-09-24T13:50:18.606Z" },
+    { url = "https://files.pythonhosted.org/packages/13/02/58b0b8d9c17c93ab6340edd8b7308c0c5a5b81f94ce65705819b7416dba5/shapely-2.1.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:136ab87b17e733e22f0961504d05e77e7be8c9b5a8184f685b4a91a84efe3c26", size = 3110842, upload-time = "2025-09-24T13:50:21.77Z" },
+    { url = "https://files.pythonhosted.org/packages/af/61/8e389c97994d5f331dcffb25e2fa761aeedfb52b3ad9bcdd7b8671f4810a/shapely-2.1.2-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:16c5d0fc45d3aa0a69074979f4f1928ca2734fb2e0dde8af9611e134e46774e7", size = 4021316, upload-time = "2025-09-24T13:50:23.626Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/d4/9b2a9fe6039f9e42ccf2cb3e84f219fd8364b0c3b8e7bbc857b5fbe9c14c/shapely-2.1.2-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:6ddc759f72b5b2b0f54a7e7cde44acef680a55019eb52ac63a7af2cf17cb9cd2", size = 4178586, upload-time = "2025-09-24T13:50:25.443Z" },
+    { url = "https://files.pythonhosted.org/packages/16/f6/9840f6963ed4decf76b08fd6d7fed14f8779fb7a62cb45c5617fa8ac6eab/shapely-2.1.2-cp311-cp311-win32.whl", hash = "sha256:2fa78b49485391224755a856ed3b3bd91c8455f6121fee0db0e71cefb07d0ef6", size = 1543961, upload-time = "2025-09-24T13:50:26.968Z" },
+    { url = "https://files.pythonhosted.org/packages/38/1e/3f8ea46353c2a33c1669eb7327f9665103aa3a8dfe7f2e4ef714c210b2c2/shapely-2.1.2-cp311-cp311-win_amd64.whl", hash = "sha256:c64d5c97b2f47e3cd9b712eaced3b061f2b71234b3fc263e0fcf7d889c6559dc", size = 1722856, upload-time = "2025-09-24T13:50:28.497Z" },
+]
+
+[[package]]
 name = "six"
 version = "1.17.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1647,6 +1754,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d6/68/a39307bcc4116a30b2106f2e689130a48de8bd8a1e635b5e1030e46fcd9e/transformers-4.57.1.tar.gz", hash = "sha256:f06c837959196c75039809636cd964b959f6604b75b8eeec6fdfc0440b89cc55", size = 10142511, upload-time = "2025-10-14T15:39:26.18Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/71/d3/c16c3b3cf7655a67db1144da94b021c200ac1303f82428f2beef6c2e72bb/transformers-4.57.1-py3-none-any.whl", hash = "sha256:b10d05da8fa67dc41644dbbf9bc45a44cb86ae33da6f9295f5fbf5b7890bd267", size = 11990925, upload-time = "2025-10-14T15:39:23.085Z" },
+]
+
+[[package]]
+name = "trimesh"
+version = "4.12.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/79/37/5cb90f04990260d2caceb6093560c6cefafca1ec522c1e43be01ca658244/trimesh-4.12.2.tar.gz", hash = "sha256:c8ca31571ac00b112e4e160e66a2d4c3491df321f056bd33806be0485d1af9d9", size = 842220, upload-time = "2026-05-01T00:57:43.333Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/05/98/716a473cfb24750858ddd5d14e6527539dd206583a46408d08eeb2844a75/trimesh-4.12.2-py3-none-any.whl", hash = "sha256:b5b5afa63c5272345f2858f7676bc8c217dc8a89f4fadf6193fe10a81b5ff2aa", size = 741043, upload-time = "2026-05-01T00:57:40.763Z" },
 ]
 
 [[package]]

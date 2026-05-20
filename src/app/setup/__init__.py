@@ -1,7 +1,7 @@
 import os
 
 from app.constants import APP_ENVIRONMENT, DEBUG
-from config.logging import setup
+from app.logging import setup
 
 
 def setup_from_env(environment: str = None):
