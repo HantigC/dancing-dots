@@ -249,7 +249,6 @@ dependencies = [
     { name = "einops" },
     { name = "faiss-cpu" },
     { name = "h5py" },
-    { name = "hloc" },
     { name = "hydra-core" },
     { name = "kornia" },
     { name = "lightglue" },
@@ -281,6 +280,7 @@ build = [
 ]
 dev = [
     { name = "cython" },
+    { name = "hloc" },
     { name = "ipykernel" },
     { name = "pip" },
 ]
@@ -295,11 +295,10 @@ requires-dist = [
     { name = "einops", specifier = ">=0.8.1" },
     { name = "faiss-cpu", specifier = ">=1.13.2" },
     { name = "h5py", specifier = "==3.16.0" },
-    { name = "hloc", git = "https://github.com/cvg/Hierarchical-Localization.git" },
     { name = "hydra-core", specifier = ">=1.3.2" },
     { name = "kagglehub", marker = "extra == 'kaggle'", specifier = ">=0.3" },
     { name = "kornia", specifier = ">=0.8.2" },
-    { name = "lightglue" },
+    { name = "lightglue", git = "https://github.com/cvg/LightGlue" },
     { name = "manifold3d", specifier = ">=3.0.0" },
     { name = "mast3r", path = "deps/whls/mast3r-0.1.0-py3-none-any.whl" },
     { name = "matplotlib", specifier = ">=3.10.7" },
@@ -322,6 +321,7 @@ provides-extras = ["kaggle"]
 build = [{ name = "setuptools", specifier = ">=80.9.0" }]
 dev = [
     { name = "cython", specifier = ">=3.2.4" },
+    { name = "hloc", git = "https://github.com/cvg/Hierarchical-Localization.git" },
     { name = "ipykernel", specifier = ">=7.1.0" },
     { name = "pip", specifier = ">=25.3" },
 ]

@@ -13,7 +13,6 @@ dependencies = [
     "einops>=0.8.1",
     "faiss-cpu>=1.13.2",
     "h5py==3.16.0",
-    "hloc",
     "hydra-core>=1.3.2",
     "kornia>=0.8.2",
     "lightglue",
@@ -44,6 +43,7 @@ build = [
     "setuptools>=80.9.0",
 ]
 dev = [
+    "hloc",
     "cython>=3.2.4",
     "ipykernel>=7.1.0",
     "pip>=25.3",
@@ -59,13 +59,15 @@ asmk = [
 
 [project.scripts]
 run-on-mps = "app.imc2025.run.on_mps:main"
-upload-to-kaggle = "scripts.upload_to_kaggle:main"
+upload-dataset-to-kaggle = "scripts.kaggle.upload_dataset:main"
+upload-model-weights-to-kaggle = "scripts.kaggle.upload_model_weights:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.uv.sources]
 hloc = { git = "https://github.com/cvg/Hierarchical-Localization.git" }
+lightglue = { git = "git+https://github.com/cvg/LightGlue"}
 croco = { path = "deps/whls/croco-0.1.2-py3-none-any.whl" }
 dust3r = { path = "deps/whls/dust3r-0.1.0-py3-none-any.whl" }
 mast3r = { path = "deps/whls/mast3r-0.1.0-py3-none-any.whl" }
