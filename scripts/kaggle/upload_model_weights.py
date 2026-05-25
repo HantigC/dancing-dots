@@ -5,7 +5,7 @@ import argparse
 from pathlib import Path
 
 import kagglehub
-from .version import get_project_version
+from mts.helpers.kaggle.version import get_project_version
 
 DEFAULT_VARIATION = "default"
 DEFAULT_FRAMEWORK = "pytorch"

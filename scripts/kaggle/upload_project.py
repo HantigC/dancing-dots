@@ -6,7 +6,7 @@ import subprocess
 from importlib.metadata import version
 from pathlib import Path
 
-from .version import get_project_version, get_project_name
+from mts.helpers.kaggle.version import get_project_version, get_project_name
 import kagglehub
 
 # Directories and files that are not needed at Kaggle runtime
