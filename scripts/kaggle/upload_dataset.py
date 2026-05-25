@@ -28,7 +28,7 @@ IGNORE_PATTERNS = [
     "__pycache__/",
     ".ipynb_checkpoints/",
     # model weights — upload separately or mount as a Kaggle dataset
-    "checkpoints/",
+    "model-weights/",
     # misc
     ".git/",
     ".DS_Store",

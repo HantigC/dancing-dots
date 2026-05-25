@@ -8,7 +8,7 @@ from hydra.utils import get_method
 from omegaconf import OmegaConf
 
 from app.constants import DEBUG
-from config.logging import setup_file_logging
+from app.logging import setup_file_logging
 from app.imc2025.pipeline import ALL, IMC2025Pipeline
 from app.imc2025.prediction import load_from_csv, sample_to_csv
 from mts.core.types import PathLike
