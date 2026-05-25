@@ -6,6 +6,7 @@ import subprocess
 from importlib.metadata import version
 from pathlib import Path
 
+from .version import get_project_version, get_project_name
 import kagglehub
 
 # Directories and files that are not needed at Kaggle runtime
@@ -72,8 +73,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    dataset = args.dataset or _default_dataset_name()
-    notes = args.notes or _default_dataset_name()
+    dataset = args.dataset or get_project_name()
+    notes = args.notes or get_project_version()
     handle = f"{args.username}/{dataset}"
     local_dir = Path(args.root).resolve()
     print(f"Uploading {local_dir} → {handle!r}")

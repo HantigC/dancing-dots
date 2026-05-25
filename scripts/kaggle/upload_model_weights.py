@@ -2,21 +2,13 @@
 """Upload model weights to a Kaggle model."""
 
 import argparse
-import subprocess
 from pathlib import Path
 
 import kagglehub
+from .version import get_project_version
 
 DEFAULT_VARIATION = "default"
 DEFAULT_FRAMEWORK = "pytorch"
-
-
-def _default_version_notes() -> str:
-    short_commit = subprocess.check_output(
-        ["git", "rev-parse", "--short", "HEAD"],
-        stderr=subprocess.DEVNULL,
-    ).decode().strip()
-    return f"commit {short_commit}"
 
 
 def main() -> None:
@@ -49,7 +41,7 @@ def main() -> None:
     args = parser.parse_args()
 
     handle = f"{args.username}/{args.model}/{args.framework}/{args.variation}"
-    notes = args.notes or _default_version_notes()
+    notes = args.notes or get_project_version()
     local_dir = Path(args.root).resolve()
 
     print(f"Uploading {local_dir} → {handle!r}")
