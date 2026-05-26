@@ -69,9 +69,9 @@ def run_from_cfg(cfg) -> IMC2025Pipeline:
             datasets_names = ALL
         imc2025_pipeline.run(datasets_names)
         is_train = cfg.get("is_train", True)
-        submission_dest_dirpath = Path(
-            cfg.get("submission_dest_dirpath", imc2025_pipeline.project_dirpath)
-        )
+        submission_dest_dirpath = cfg.get("submission_dest_dirpath")
+        submission_dest_dirpath = submission_dest_dirpath or imc2025_pipeline.project_dirpath
+        submission_dest_dirpath = Path(submission_dest_dirpath)
 
         submission_filepath = submission_dest_dirpath / "submission.csv"
         sample_to_csv(imc2025_pipeline.samples, submission_filepath)
