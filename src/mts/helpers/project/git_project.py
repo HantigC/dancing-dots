@@ -48,12 +48,20 @@ class GitProject(BaseProject):
             return
 
         local = local_result.stdout.strip()
-        remote_ref = subprocess.run(
+        remote_ref_result = subprocess.run(
             ["git", "rev-parse", f"{self.remote}/{self.branch}"],
             capture_output=True,
             text=True,
-        ).stdout.strip()
+        )
+        if remote_ref_result.returncode != 0:
+            LOGGER.warning(
+                "Could not resolve '%s/%s'; skipping sync check.",
+                self.remote,
+                self.branch,
+            )
+            return
 
+        remote_ref = remote_ref_result.stdout.strip()
         if local != remote_ref:
             raise BranchOutOfSyncException(
                 f"Local branch is not in sync with '{self.remote}/{self.branch}'. "

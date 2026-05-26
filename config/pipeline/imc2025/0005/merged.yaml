@@ -1,7 +1,7 @@
 defaults:
     - base          # inherit base config
     - _self_        # this file's keys override
-
+description: use mast3r with transient merging
 pipeline_steps:
   paring:
     device: mps
