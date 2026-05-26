@@ -135,7 +135,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
                 device=self.device,
                 tqdm_kwargs=dict(disable=True),
             )
-        except ValueError:
+        except Exception:
             LOGGER.exception("Trouble with extracting the dense keypoints")
             matches_map = {}
 

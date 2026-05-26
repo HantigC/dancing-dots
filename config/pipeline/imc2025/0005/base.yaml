@@ -22,7 +22,7 @@ pipeline_steps:
       _target_: mts.pipeline.step.pair.sift.SiftDistanceParer
       dinov2_global_descriptor:
         _target_: mts.core.embedder.dinov2.DinoV2GlobalDescriptors.from_pretrained
-        model_location: facebook/dinov2-base
+        model_location: model-weights/fb-dinov2/snapshots/f9e44c814b77203eaa57a6bdbbd535f21ede1415
 
   kp_matching: 
     _target_: mts.pipeline.step.base.OnDeviceRunner

@@ -3,6 +3,10 @@ submission_dest_dirpath: "/kaggle/working"
 is_train: False
 
 pipeline_steps:
+  paring:
+    step:
+      dinov2_global_descriptor:
+        model_location: /kaggle/input/models/hantig/fb-dinov2/pytorch/default/1/snapshots/f9e44c814b77203eaa57a6bdbbd535f21ede1415
   kp_matching: 
     step:
       mast3r_model_checkpoint: "/kaggle/input/models/hantig/mast3r/pytorch/default/3/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"

@@ -70,11 +70,8 @@ def extract_dense_keypoints(
             corres = extract_correspondences_nonsym(
                 desc1, desc2, conf1, conf2, device=device, subsample=8, pixel_tol=5
             )
-        except ValueError as e:
-            if "index -1 is out of bounds for array with size " in e:
-                LOGGER.exception("Something happened when extracting the matches")
-                continue
-            raise e
+        except Exception:
+            LOGGER.exception("Something happened when extracting the matches for (%s, %s) pair", name1, name2)
         score = corres[2]
         mask = score >= match_conf_th
         matches_im0 = corres[0][mask].cpu().numpy()
@@ -136,14 +133,18 @@ def match_pairs(
     dict[str, np.ndarray],
     dict[tuple[str, str], np.ndarray],
 ]:
-    out_match = extract_dense_keypoints(
-        mast3r_model,
-        index_pairs,
-        image_list,
-        min_pairs=min_pairs,
-        match_conf_th=match_conf_th,
-        device=device,
-    )
+    try:
+        out_match = extract_dense_keypoints(
+            mast3r_model,
+            index_pairs,
+            image_list,
+            min_pairs=min_pairs,
+            match_conf_th=match_conf_th,
+            device=device,
+        )
+    except Exception :
+        LOGGER.exception("An error occurred while matching")
+
 
     global_keypoints, global_matches = merge_matches(out_match)
     # print("points and matches unified")
