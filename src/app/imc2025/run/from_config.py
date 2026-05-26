@@ -8,9 +8,9 @@ from hydra.utils import get_method
 from omegaconf import OmegaConf
 
 from app.constants import DEBUG
-from app.logging import setup_file_logging
 from app.imc2025.pipeline import ALL, IMC2025Pipeline
 from app.imc2025.prediction import load_from_csv, sample_to_csv
+from app.logging import setup_file_logging
 from mts.core.types import PathLike
 from mts.helpers.imc import metric
 from mts.helpers.project.git_project import GitProject
@@ -21,9 +21,7 @@ LOGGER = logging.getLogger(__name__)
 
 def create_imc2025_from_cfg(cfg):
     last_project_iteration = GitProject.from_next_iteration(
-        cfg.project_path,
-        create=False,
-        save=cfg.save_project_to_git
+        cfg.project_path, create=False, save=cfg.save_project_to_git,
     )
     create_pipeline = get_method(cfg.reconstruction_runner.create_pipeline_method)
     create_repository = get_method(cfg.reconstruction_runner.create_repository_method)
@@ -65,8 +63,13 @@ def run_from_cfg(cfg) -> IMC2025Pipeline:
             datasets_names = ALL
         imc2025_pipeline.run(datasets_names)
         is_train = cfg.get("is_train", True)
+        submission_dest_dirpath = Path(
+            cfg.get("submission_dest_dirpath", imc2025_pipeline.project_dirpath)
+        )
 
-        submission_filepath = imc2025_pipeline.project_dirpath / "submission.csv"
+        imc2025_pipeline.submission_dest_dirpath
+
+        submission_filepath = submission_dest_dirpath / "submission.csv"
         sample_to_csv(imc2025_pipeline.samples, submission_filepath)
         data_dirpath = Path(cfg.data_dirpath)
 
@@ -98,21 +101,23 @@ def run_from_config_filepath(hydra_config_filepath: PathLike) -> IMC2025Pipeline
 
 
 def run_on_mps(environment: str = DEBUG):
-    from app.setup import setup_from_env
-    from hydra import compose, initialize_config_dir                                                                                                         
     from pathlib import Path
+
+    from hydra import compose, initialize_config_dir
     from omegaconf import OmegaConf
+
+    from app.setup import setup_from_env
 
     setup_from_env((environment))
 
     os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
     os.environ["HYDRA_FULL_ERROR"] = "1"
 
-    config_dir = Path("config/pipeline/imc2025/0005").resolve()                                                                                                                 
-    with initialize_config_dir(config_dir=str(config_dir), version_base=None):                                                                               
+    config_dir = Path("config/pipeline/imc2025/0005").resolve()
+    with initialize_config_dir(config_dir=str(config_dir), version_base=None):
         cfg = compose(config_name="base")
 
-    mps = OmegaConf.load(config_dir / "mps.yaml")                                                                                               
+    mps = OmegaConf.load(config_dir / "mps.yaml")
     cfg = OmegaConf.merge(cfg, mps)
 
     cfg.datasets_names = [
@@ -132,6 +137,7 @@ def run_on_mps(environment: str = DEBUG):
     ]
 
     run_from_cfg(cfg)
+
 
 def main(environment: str = DEBUG):
     from app.setup import setup_from_env

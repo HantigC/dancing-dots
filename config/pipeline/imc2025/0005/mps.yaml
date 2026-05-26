@@ -1,7 +1,7 @@
-data_dirpath: "data"
-is_train: False
-
 pipeline_steps:
+  paring:
+    device: mps
+
   kp_matching: 
-    step:
-      mast3r_model_checkpoint: "/kaggle/input/models/hantig/mast3r/pytorch/default/3/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: mps

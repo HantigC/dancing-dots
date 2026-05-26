@@ -1,0 +1,8 @@
+data_dirpath: "/kaggle/input/competitions/image-matching-challenge-2025-ongoing"
+submission_filepath: "/kaggle/working"
+is_train: False
+
+pipeline_steps:
+  kp_matching: 
+    step:
+      mast3r_model_checkpoint: "/kaggle/input/models/hantig/mast3r/pytorch/default/3/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"

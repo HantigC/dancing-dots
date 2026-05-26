@@ -40,9 +40,14 @@ class GitProject(BaseProject):
         LOGGER.info("Check if everything is up to date")
         subprocess.run(["git", "fetch", self.remote], capture_output=True)
 
-        local = subprocess.run(
+        local_result = subprocess.run(
             ["git", "rev-parse", "HEAD"], capture_output=True, text=True
-        ).stdout.strip()
+        )
+        if local_result.returncode != 0:
+            LOGGER.warning("Not inside a git repository; skipping sync check.")
+            return
+
+        local = local_result.stdout.strip()
         remote_ref = subprocess.run(
             ["git", "rev-parse", f"{self.remote}/{self.branch}"],
             capture_output=True,

@@ -7,10 +7,13 @@ from app.constants import RUN, DEBUG, Environment
 from mts.core.types import PathLike
 
 
+_LOGGING_DIR = Path(__file__).parent
+
+
 def setup(environment: Environment) -> None:
     logging_config_map = {
-        RUN: "config/logging/run.yaml",
-        DEBUG: "config/logging/debug.yaml",
+        RUN: _LOGGING_DIR / "run.yaml",
+        DEBUG: _LOGGING_DIR / "debug.yaml",
     }
 
     with open(logging_config_map[environment], "rt") as f:
