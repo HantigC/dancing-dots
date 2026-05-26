@@ -11,6 +11,7 @@ origin: None
 git_commit: None
 datasets_names: None
 save_project_to_git: False
+submission_dest_dirpath: null
 
 
 pipeline_steps:

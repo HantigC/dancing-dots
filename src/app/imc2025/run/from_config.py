@@ -21,7 +21,9 @@ LOGGER = logging.getLogger(__name__)
 
 def create_imc2025_from_cfg(cfg):
     last_project_iteration = GitProject.from_next_iteration(
-        cfg.project_path, create=False, save=cfg.save_project_to_git,
+        cfg.project_path,
+        create=False,
+        save=cfg.save_project_to_git,
     )
     create_pipeline = get_method(cfg.reconstruction_runner.create_pipeline_method)
     create_repository = get_method(cfg.reconstruction_runner.create_repository_method)
@@ -66,8 +68,6 @@ def run_from_cfg(cfg) -> IMC2025Pipeline:
         submission_dest_dirpath = Path(
             cfg.get("submission_dest_dirpath", imc2025_pipeline.project_dirpath)
         )
-
-        imc2025_pipeline.submission_dest_dirpath
 
         submission_filepath = submission_dest_dirpath / "submission.csv"
         sample_to_csv(imc2025_pipeline.samples, submission_filepath)
