@@ -67,6 +67,7 @@ def run_from_cfg(cfg) -> IMC2025Pipeline:
             datasets_names = list(datasets_names)
         else:
             datasets_names = ALL
+        LOGGER.info("Running for %s datasets", str(datasets_names))
         imc2025_pipeline.run(datasets_names)
         is_train = cfg.get("is_train", True)
         submission_dest_dirpath = cfg.get("submission_dest_dirpath")

@@ -6,10 +6,11 @@ description: |
 
 project_path: iterations
 data_dirpath: "data/image-matching-challenge-2025"
+sample_filepath: null
 is_train: True
 origin: None
 git_commit: None
-datasets_names: None
+datasets_names: null
 save_project_to_git: False
 submission_dest_dirpath: null
 
