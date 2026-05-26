@@ -25,11 +25,13 @@ class GitProject(BaseProject):
         branch: str = "main",
         create: bool = True,
         save: bool = True,
+        skip_check: bool = True,
     ) -> None:
         self.remote = remote
         self.branch = branch
         self.save = save
-        self._check_in_sync()
+        if not skip_check:
+            self._check_in_sync()
         super().__init__(project_dir, iteration_name, create=create)
 
     @staticmethod
