@@ -1,12 +1,19 @@
 import subprocess
 
 
+class NotAGitRepositoryError(Exception):
+    pass
+
+
 def get_git_commit():
-    return (
-        subprocess.check_output(
-            ["git", "rev-parse", "HEAD"],
-            stderr=subprocess.DEVNULL,
+    try:
+        return (
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode("utf-8")
+            .strip()
         )
-        .decode("utf-8")
-        .strip()
-    )
+    except subprocess.CalledProcessError as e:
+        raise NotAGitRepositoryError("Not inside a git repository") from e

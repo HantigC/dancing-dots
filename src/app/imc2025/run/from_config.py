@@ -14,7 +14,7 @@ from app.logging import setup_file_logging
 from mts.core.types import PathLike
 from mts.helpers.imc import metric
 from mts.helpers.project.git_project import GitProject
-from mts.utils.git import get_git_commit
+from mts.utils.git import NotAGitRepositoryError, get_git_commit
 
 LOGGER = logging.getLogger(__name__)
 
@@ -56,7 +56,11 @@ def run_from_cfg(cfg) -> IMC2025Pipeline:
             str(cfg.origin),
             str(imc2025_pipeline.project_dirpath),
         )
-        cfg.git_commit = get_git_commit()
+        try:
+            cfg.git_commit = get_git_commit()
+        except NotAGitRepositoryError:
+            LOGGER.warning("Not inside a git repository; git commit hash not recorded.")
+            cfg.git_commit = None
         OmegaConf.save(cfg, imc2025_pipeline.project_dirpath / "config.yaml")
         datasets_names = cfg.get("datasets_names")
         if datasets_names is not None:
