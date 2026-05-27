@@ -32,7 +32,7 @@ def create_imc2025_from_cfg(cfg):
     )
     data_dirpath = Path(cfg.get("data_dirpath", "data"))
     cfg.data_dirpath = data_dirpath
-    samples_filename = cfg.get("sample_filepath", "train_labels.csv")
+    samples_filename = cfg.get("sample_filepath") or  "train_labels.csv"
     samples = load_from_csv(data_dirpath, samples_filename)
 
     imc2025_pipeline = IMC2025Pipeline(
@@ -70,6 +70,7 @@ def run_from_cfg(cfg) -> IMC2025Pipeline:
         LOGGER.info("Running for %s datasets", str(datasets_names))
         imc2025_pipeline.run(datasets_names)
         is_train = cfg.get("is_train", True)
+        import pdb;pdb.set_trace()
         submission_dest_dirpath = cfg.get("submission_dest_dirpath")
         submission_dest_dirpath = submission_dest_dirpath or imc2025_pipeline.project_dirpath
         submission_dest_dirpath = Path(submission_dest_dirpath)

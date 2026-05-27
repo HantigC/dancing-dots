@@ -60,6 +60,7 @@ asmk = [
 
 [project.scripts]
 run-on-mps = "app.imc2025.run.on_mps:main"
+run = "app.imc2025.run.run:main"
 upload-dataset-to-kaggle = "scripts.kaggle.upload_dataset:main"
 upload-model-weights-to-kaggle = "scripts.kaggle.upload_model_weights:main"
 
