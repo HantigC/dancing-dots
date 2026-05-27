@@ -9,7 +9,7 @@ from omegaconf import OmegaConf
 
 from app.constants import DEBUG
 from app.imc2025.pipeline import ALL, IMC2025Pipeline
-from app.imc2025.prediction import load_from_csv, sample_to_csv
+from app.imc2025.prediction import load_from_csv, load_test_images, sample_to_csv
 from app.logging import setup_file_logging
 from mts.core.types import PathLike
 from mts.helpers.imc import metric
@@ -32,8 +32,14 @@ def create_imc2025_from_cfg(cfg):
     )
     data_dirpath = Path(cfg.get("data_dirpath", "data"))
     cfg.data_dirpath = data_dirpath
-    samples_filename = cfg.get("sample_filepath") or  "train_labels.csv"
-    samples = load_from_csv(data_dirpath, samples_filename)
+    is_train = cfg.get("is_train", True)
+    samples_filename = cfg.get("sample_filepath")
+    if samples_filename:
+        samples = load_from_csv(data_dirpath, samples_filename)
+    elif is_train:
+        samples = load_from_csv(data_dirpath, "train_labels.csv")
+    else:
+        samples = load_test_images(data_dirpath)
 
     imc2025_pipeline = IMC2025Pipeline(
         last_project_iteration.iteration_dirpath,
@@ -70,7 +76,6 @@ def run_from_cfg(cfg) -> IMC2025Pipeline:
         LOGGER.info("Running for %s datasets", str(datasets_names))
         imc2025_pipeline.run(datasets_names)
         is_train = cfg.get("is_train", True)
-        import pdb;pdb.set_trace()
         submission_dest_dirpath = cfg.get("submission_dest_dirpath")
         submission_dest_dirpath = submission_dest_dirpath or imc2025_pipeline.project_dirpath
         submission_dest_dirpath = Path(submission_dest_dirpath)

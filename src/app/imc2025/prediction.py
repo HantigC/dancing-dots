@@ -112,6 +112,34 @@ def load_from_csv(data_dirpath: PathLike, filename: str) -> DatasetSamples:
     return load_from_df(df, data_dirpath / train_or_test)
 
 
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
+
+
+def load_test_images(
+    data_dirpath: PathLike,
+    test_subdir: str = "test",
+) -> DatasetSamples:
+    data_dirpath = Path(data_dirpath)
+    test_dirpath = data_dirpath / test_subdir
+    samples: DatasetSamples = {}
+    for dataset_dir in sorted(test_dirpath.iterdir()):
+        if not dataset_dir.is_dir():
+            continue
+        predictions = [
+            Prediction(
+                image_id=f"{dataset_dir.name}_{f.name}",
+                dataset=dataset_dir.name,
+                filename=f.name,
+                image_filepath=f,
+            )
+            for f in sorted(dataset_dir.iterdir())
+            if f.suffix.lower() in IMAGE_SUFFIXES
+        ]
+        if predictions:
+            samples[dataset_dir.name] = predictions
+    return samples
+
+
 def sample_to_csv(
     samples: DatasetSamples,
     filepath: PathLike,
