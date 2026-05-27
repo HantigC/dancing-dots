@@ -17,6 +17,7 @@ dependencies = [
     "kornia>=0.8.2",
     "lightglue",
     "mast3r",
+    "pillow==12.0.0",
     "nbformat==5.10.4",
     "more-itertools>=10.8.0",
     "numpy==2.3.4",
