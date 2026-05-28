@@ -121,7 +121,10 @@ class H5ImageRepository(BaseImageRepository):
 
     def get_repository_metadata(self, name: str):
         with self._reading() as h5_read:
-            value = h5_read["repository_metadata"].attrs.get(name)
+            grp = h5_read.get("repository_metadata")
+            if grp is None:
+                return None
+            value = grp.attrs.get(name)
             if value is not None:
                 value = json.loads(value)
         return value
@@ -152,11 +155,17 @@ class H5ImageRepository(BaseImageRepository):
 
     def image_ids(self) -> Generator[int, None, None]:
         with self._reading() as h5_read:
-            yield from (int(k) for k in h5_read["images"].keys())
+            images_grp = h5_read.get("images")
+            if images_grp is None:
+                return
+            yield from (int(k) for k in images_grp.keys())
 
     def images_num(self):
         with self._reading() as h5_read:
-            return len(h5_read["images"])
+            images_grp = h5_read.get("images")
+            if images_grp is None:
+                return 0
+            return len(images_grp)
 
     def get_image_id(self, filepath: PathLike) -> ImageId:
         filepath = str(filepath)
@@ -172,12 +181,23 @@ class H5ImageRepository(BaseImageRepository):
 
     def iterate_over_images(self) -> Generator[tuple[ImageId, np.ndarray], None, None]:
         with self._reading() as h5_read:
-            for image_id in h5_read["images"]:
+            images_grp = h5_read.get("images")
+            if images_grp is None:
+                return
+            for image_id in images_grp:
                 yield int(image_id), self.load_image(image_id)
 
     def load_image(self, image_id: ImageId) -> np.ndarray:
         with self._reading() as h5_read:
-            return imread_rgb(h5_read["images"][str(image_id)].attrs["filepath"])
+            images_grp = h5_read.get("images")
+            if images_grp is None:
+                LOGGER.debug("No images found in repository")
+                return None
+            img_grp = images_grp.get(str(image_id))
+            if img_grp is None:
+                LOGGER.debug("Image %s not found in repository", image_id)
+                return None
+            return imread_rgb(img_grp.attrs["filepath"])
 
     def add_metadata(self, image_id: int, **kwargs):
         with self:
@@ -220,7 +240,10 @@ class H5ImageRepository(BaseImageRepository):
 
     def get_metadata_values(self, image_id: ImageId, *args):
         with self._reading() as h5_read:
-            metadata_grp = h5_read["metadata"][str(image_id)]
+            metadata_grp = h5_read.get("metadata", {}).get(str(image_id))
+            if metadata_grp is None:
+                LOGGER.debug("No metadata found for image %s", image_id)
+                return {}
             return {json.loads(metadata_grp[k]) for k in args}
 
     def add_pose(self, image_id: int, pose: Rigid3D) -> None:
@@ -234,37 +257,52 @@ class H5ImageRepository(BaseImageRepository):
 
     def get_pose(self, image_id: int):
         with self._reading() as h5_read:
-            if str(image_id) not in h5_read["poses"]:
+            poses_grp = h5_read.get("poses")
+            if poses_grp is None:
+                LOGGER.debug("No poses found in repository")
                 return None
-            pose_grp = h5_read["poses"][str(image_id)]
+            if str(image_id) not in poses_grp:
+                return None
+            pose_grp = poses_grp[str(image_id)]
             return Rigid3D(pose_grp.attrs["rotation"], pose_grp.attrs["translation"])
 
-    def add_keypoints(self, img_id: int, keypoints: np.ndarray):
+    def add_keypoints(self, img_id: int, keypoints: np.ndarray, *, name: str = "keypoints"):
         with self:
-            grp = self._features_grp.require_group(str(img_id))
-            if "keypoints" in grp:
-                del grp["keypoints"]
-            grp.create_dataset("keypoints", data=keypoints)
+            grp = self._features_grp.require_group(str(img_id)).require_group("keypoints")
+            if name in grp:
+                del grp[name]
+            grp.create_dataset(name, data=keypoints)
 
-    def get_keypoints(self, img_id: int):
+    def get_keypoints(self, img_id: int, *, name: str = "keypoints"):
         with self._reading() as h5_read:
-            grp = h5_read["features"].get(str(img_id))
-            if grp is None or "keypoints" not in grp:
+            if "features" not in h5_read:
                 return None
-            return grp["keypoints"][:]
+            img_grp = h5_read["features"].get(str(img_id))
+            if img_grp is None:
+                return None
+            kp_grp = img_grp.get("keypoints")
+            if kp_grp is None or name not in kp_grp:
+                return None
+            return kp_grp[name][:]
 
-    def add_descriptors(self, img_id: int, descriptors: np.ndarray):
+    def add_descriptors(self, img_id: int, descriptors: np.ndarray, *, name: str = "descriptors"):
         with self:
-            grp = self._features_grp.require_group(str(img_id))
-            if "descriptors" in grp:
-                del grp["descriptors"]
+            grp = self._features_grp.require_group(str(img_id)).require_group("descriptors")
+            if name in grp:
+                del grp[name]
+            grp.create_dataset(name, data=descriptors)
 
-    def get_descriptors(self, img_id: int):
+    def get_descriptors(self, img_id: int, *, name: str = "descriptors"):
         with self._reading() as h5_read:
-            grp = h5_read["features"].get(str(img_id))
-            if grp is None or "descriptors" not in grp:
+            if "features" not in h5_read:
                 return None
-            return grp["descriptors"][:]
+            img_grp = h5_read["features"].get(str(img_id))
+            if img_grp is None:
+                return None
+            desc_grp = img_grp.get("descriptors")
+            if desc_grp is None or name not in desc_grp:
+                return None
+            return desc_grp[name][:]
 
     def add_global_descriptor(self, img_id: int, descriptor: np.ndarray):
         with self:
@@ -275,6 +313,8 @@ class H5ImageRepository(BaseImageRepository):
 
     def get_global_descriptor(self, img_id: int):
         with self._reading() as h5_read:
+            if "features" not in h5_read:
+                return None
             grp = h5_read["features"].get(str(img_id))
             if grp is None or "global_descriptor" not in grp:
                 return None
@@ -317,36 +357,47 @@ class H5ImageRepository(BaseImageRepository):
                 return {}
             return {k: json.loads(v) for k, v in grp.attrs.items()}
 
-    def add_matches(self, img_id1: int, img_id2: int, matches: np.ndarray):
+    def add_matches(self, img_id1: int, img_id2: int, matches: np.ndarray, *, name: str = "matches"):
         with self:
             key = self._pair_key(img_id1, img_id2)
-            if key in self._matches_grp:
-                del self._matches_grp[key]
-
+            named_grp = self._matches_grp.require_group(name)
+            if key in named_grp:
+                del named_grp[key]
             if img_id1 > img_id2:
                 matches = matches[:, ::-1]
-            self._matches_grp.create_dataset(key, data=matches)
+            named_grp.create_dataset(key, data=matches)
 
-    def get_matches(self, img_id1: int, img_id2: int):
+    def get_matches(self, img_id1: int, img_id2: int, *, name: str = "matches"):
         with self._reading() as h5_read:
-            key = self._pair_key(img_id1, img_id2)
-            if key not in h5_read["matches"]:
+            if "matches" not in h5_read:
                 return None
-            matches = h5_read["matches"][key][:]
+            named_grp = h5_read["matches"].get(name)
+            if named_grp is None:
+                return None
+            key = self._pair_key(img_id1, img_id2)
+            if key not in named_grp:
+                return None
+            matches = named_grp[key][:]
             if img_id1 > img_id2:
                 matches = matches[:, ::-1]
             return matches
 
     def iterate_over_matches(
         self,
+        *,
+        name: str = "matches",
     ) -> Generator[
         tuple[PairType[int], np.ndarray],
         None,
         None,
     ]:
         with self._reading() as h_reading:
-            matches = h_reading["matches"]
-            for pair_id, match in matches.items():
+            if "matches" not in h_reading:
+                return
+            named_grp = h_reading["matches"].get(name)
+            if named_grp is None:
+                return
+            for pair_id, match in named_grp.items():
                 st_image_id, nd_image_id = pair_id.split("_")
                 st_image_id, nd_image_id = int(st_image_id), int(nd_image_id)
                 yield (st_image_id, nd_image_id), match[:]
@@ -390,6 +441,8 @@ class H5ImageRepository(BaseImageRepository):
 
     def pair_num(self):
         with self._reading() as h5_read:
+            if "pairs" not in h5_read:
+                return 0
             return len(h5_read["pairs"][:])
 
     def close(self):

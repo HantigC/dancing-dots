@@ -1,8 +1,8 @@
 name: IMC2025
 description: |
-  Use mast3r par3r for pair creation
-  Use minimum spanning tree to get the initial starting pairs
-  Use Merged mast3r matcher
+  Use SiftDistanceParer (DINOv2 global + SIFT validation) for pair creation
+  Use SiftKeypointMatchStep for CPU-based SIFT extraction and matching
+  Use ColmapReconstructionStep for incremental 3D reconstruction
 
 project_path: iterations
 data_dirpath: "data/image-matching-challenge-2025"
@@ -21,24 +21,24 @@ pipeline_steps:
     device: cuda:0
     step:
       _target_: mts.pipeline.step.pair.sift.SiftDistanceParer
+      save_keypoints: True
+      save_descriptors: True
+      save_matches: True
       dinov2_global_descriptor:
         _target_: mts.core.embedder.dinov2.DinoV2GlobalDescriptors.from_pretrained
         model_location: model-weights/fb-dinov2/snapshots/f9e44c814b77203eaa57a6bdbbd535f21ede1415
 
-  kp_matching: 
-    _target_: mts.pipeline.step.base.OnDeviceRunner
-    device: cuda:0
-    step:
-      _target_: mts.pipeline.step.match.mast3r.merged.Mast3rMatchPipelineStep.from_checkpoint
-      grow_graph: 
-        _target_: mts.core.scene_graph.transient.grow_densely
-        _partial_: true
-      mast3r_model_checkpoint: "model-weights/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
+  kp_matching:
+    _target_: mts.pipeline.step.match.sift.SiftKeypointMatchStep
+    num_features: 2048
+    ratio_threshold: 0.75
+    min_matches: 30
 
   reconstruction:
     _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep
-    keypoints_name: mast3r
-    matches_name: mast3r
+    keypoints_name: sift
+    descriptors_name: sift
+    matches_name: sift
     mapper_options:
       _target_: mts.helpers.colmap.options.create_incremental_pipeline_options
       min_model_size: 3

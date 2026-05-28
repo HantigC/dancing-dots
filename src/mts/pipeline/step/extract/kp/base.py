@@ -11,9 +11,13 @@ class TorchExtractStep(BasePipelineStep):
     def __init__(
         self,
         extractor: BaseExtractor,
+        keypoints_name: str = "keypoints",
+        descriptors_name: str = "descriptors",
     ) -> None:
         super().__init__()
         self.extractor = extractor
+        self.keypoints_name = keypoints_name
+        self.descriptors_name = descriptors_name
 
     def _extract(
         self,
@@ -35,8 +39,8 @@ class TorchExtractStep(BasePipelineStep):
                 keypoints = keypoints.detach().cpu().numpy()
                 descriptors = descriptors.detach().cpu().numpy()
 
-                image_repository.add_keypoints(image_index, keypoints)
-                image_repository.add_descriptors(image_index, descriptors)
+                image_repository.add_keypoints(image_index, keypoints, name=self.keypoints_name)
+                image_repository.add_descriptors(image_index, descriptors, name=self.descriptors_name)
 
     @use_image_repository
     def run(self, image_repository: ImageRepository) -> None:

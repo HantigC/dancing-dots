@@ -16,6 +16,9 @@ def export_to_colmap(
     db_filepath: PathLike,
     single_camera: bool = False,
     camera_model: str = CameraModel.PINHOLE,
+    keypoints_name: str = "keypoints",
+    descriptors_name: str = "descriptors",
+    matches_name: str = "matches",
 ) -> COLMAPDatabase:
     db = COLMAPDatabase(db_filepath)
     db.create_tables()
@@ -27,11 +30,14 @@ def export_to_colmap(
             db,
             camera_model,
             single_camera,
+            keypoints_name=keypoints_name,
+            descriptors_name=descriptors_name,
         )
         add_matches(
             id_to_db_id,
             image_repository,
             db,
+            matches_name=matches_name,
         )
         db.commit()
 
@@ -48,6 +54,8 @@ def add_keypoints(
     db: COLMAPDatabase,
     camera_model: str,
     single_camera: bool = False,
+    keypoints_name: str = "keypoints",
+    descriptors_name: str = "descriptors",
 ) -> dict[int, int]:
     LOGGER.info("Export keypoints and descriptors")
     camera_id = None
@@ -57,8 +65,8 @@ def add_keypoints(
         total=image_repository.images_num(),
         desc="Add Keypoints",
     ):
-        keypoints = image_repository.get_keypoints(image_id)
-        descriptors = image_repository.get_descriptors(image_id)
+        keypoints = image_repository.get_keypoints(image_id, name=keypoints_name)
+        descriptors = image_repository.get_descriptors(image_id, name=descriptors_name)
         image_filepath = image_repository.get_filepath(image_id)
         # TODO: add more methods to to colmap-db: e.g. exists
 
@@ -84,6 +92,7 @@ def add_matches(
     id_to_db_id: dict[int, int],
     image_repository: ImageRepository,
     db: COLMAPDatabase,
+    matches_name: str = "matches",
 ) -> None:
     LOGGER.info("Export matches")
     for from_idx, to_idx in tqdm(
@@ -94,7 +103,7 @@ def add_matches(
         from_db_id = id_to_db_id[from_idx]
         to_db_id = id_to_db_id[to_idx]
 
-        matches = image_repository.get_matches(from_idx, to_idx)
+        matches = image_repository.get_matches(from_idx, to_idx, name=matches_name)
         if matches is not None:
             try:
                 db.add_matches(from_db_id, to_db_id, matches)

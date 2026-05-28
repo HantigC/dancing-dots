@@ -119,17 +119,17 @@ class ImageRepository(BaseImageRepository):
     def get_pose(self, image_id: ImageId) -> Rigid3D | None:
         return self._poses.get(image_id)
 
-    def add_keypoints(self, img_id: int, keypoints: np.ndarray):
-        self._keypoints[img_id] = keypoints
+    def add_keypoints(self, img_id: int, keypoints: np.ndarray, *, name: str = "keypoints"):
+        self._keypoints.setdefault(img_id, {})[name] = keypoints
 
-    def get_keypoints(self, img_id: int) -> np.ndarray | None:
-        return self._keypoints.get(img_id)
+    def get_keypoints(self, img_id: int, *, name: str = "keypoints") -> np.ndarray | None:
+        return self._keypoints.get(img_id, {}).get(name)
 
-    def add_descriptors(self, img_id: int, descriptors: np.ndarray):
-        self._descriptors[img_id] = descriptors
+    def add_descriptors(self, img_id: int, descriptors: np.ndarray, *, name: str = "descriptors"):
+        self._descriptors.setdefault(img_id, {})[name] = descriptors
 
-    def get_descriptors(self, img_id: int) -> np.ndarray | None:
-        return self._descriptors.get(img_id)
+    def get_descriptors(self, img_id: int, *, name: str = "descriptors") -> np.ndarray | None:
+        return self._descriptors.get(img_id, {}).get(name)
 
     def add_global_descriptor(self, img_id: int, keypoints: np.ndarray):
         self._global_descriptors[img_id] = keypoints
@@ -137,13 +137,13 @@ class ImageRepository(BaseImageRepository):
     def get_global_descriptor(self, img_id: int) -> np.ndarray | None:
         return self._global_descriptors.get(img_id)
 
-    def add_matches(self, img_id1: int, img_id2: int, matches: np.ndarray):
+    def add_matches(self, img_id1: int, img_id2: int, matches: np.ndarray, *, name: str = "matches"):
         key = tuple(sorted((img_id1, img_id2)))
-        self._matches[key] = matches
+        self._matches.setdefault(key, {})[name] = matches
 
-    def get_matches(self, img_id1: int, img_id2: int) -> np.ndarray | None:
+    def get_matches(self, img_id1: int, img_id2: int, *, name: str = "matches") -> np.ndarray | None:
         key = tuple(sorted((img_id1, img_id2)))
-        return self._matches.get(key)
+        return self._matches.get(key, {}).get(name)
 
     def add_match_metadata(self, img_id1: int, img_id2: int, **kwargs):
         key = tuple(sorted((img_id1, img_id2)))

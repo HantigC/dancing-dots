@@ -22,10 +22,16 @@ class BaseColmapReconstructionStep(BasePipelineStep, ABC):
         self,
         single_camera: bool = True,
         camera_model: str = CameraModel.PINHOLE,
+        keypoints_name: str = "keypoints",
+        descriptors_name: str = "descriptors",
+        matches_name: str = "matches",
     ) -> None:
         super().__init__()
         self.single_camera = single_camera
         self.camera_model = camera_model
+        self.keypoints_name = keypoints_name
+        self.descriptors_name = descriptors_name
+        self.matches_name = matches_name
 
     @use_image_repository(params=["state"])
     def run(
@@ -42,6 +48,9 @@ class BaseColmapReconstructionStep(BasePipelineStep, ABC):
                 colmap_db_filepath,
                 self.single_camera,
                 self.camera_model,
+                keypoints_name=self.keypoints_name,
+                descriptors_name=self.descriptors_name,
+                matches_name=self.matches_name,
             )
         else:
             db = COLMAPDatabase.connect(colmap_db_filepath)

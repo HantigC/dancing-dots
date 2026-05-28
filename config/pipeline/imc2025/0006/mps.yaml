@@ -1,0 +1,3 @@
+pipeline_steps:
+  paring:
+    device: mps

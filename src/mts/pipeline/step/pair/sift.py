@@ -61,9 +61,10 @@ def filter_validated_paris(
     pairs: list[DistancedTriple],
     kpts_descriptors: list[tuple[np.ndarray, np.ndarray]],
     images_sizes: dict[int, tuple[int, int]],
-) -> list[DistancedTriple]:
+) -> tuple[list[DistancedTriple], dict[tuple[int, int], np.ndarray]]:
     filtered_pairs = []
-    for triple in tqdm(pairs):
+    validated_matches: dict[tuple[int, int], np.ndarray] = {}
+    for triple in tqdm(pairs, desc="Validate pairs with SIFT"):
         st_idx, nd_idx = triple.st, triple.nd
         kpts1, descriptors1 = kpts_descriptors[st_idx]
         kpts2, descriptors2 = kpts_descriptors[nd_idx]
@@ -80,7 +81,13 @@ def filter_validated_paris(
         )
         if len(inlier_matches) > 30:
             filtered_pairs.append(DistancedTriple(st_idx, nd_idx, triple.distance))
-    return filtered_pairs
+            validated_matches[(st_idx, nd_idx)] = matches
+    LOGGER.info(
+        "Validated pairs: %d / %d passed SIFT inlier filter",
+        len(filtered_pairs),
+        len(pairs),
+    )
+    return filtered_pairs, validated_matches
 
 
 class SiftDistanceParer(BasePipelineStep):
@@ -88,10 +95,22 @@ class SiftDistanceParer(BasePipelineStep):
         self,
         dinov2_global_descriptor: DinoV2GlobalDescriptors,
         upper_threshold: float = 1.01,
+        cutoff_th: float = 0.25,
+        distance_th: float = 2.0,
+        min_pairs: int = 1,
+        save_keypoints: bool = False,
+        save_descriptors: bool = False,
+        save_matches: bool = False,
     ) -> None:
         super().__init__()
         self.dinov2_global_descriptor = dinov2_global_descriptor
         self.upper_threshold = upper_threshold
+        self.cutoff_th = cutoff_th
+        self.distance_th = distance_th
+        self.min_pairs = min_pairs
+        self.save_keypoints = save_keypoints
+        self.save_descriptors = save_descriptors
+        self.save_matches = save_matches
 
     def run(
         self,
@@ -116,7 +135,7 @@ class SiftDistanceParer(BasePipelineStep):
         image_repository: BaseImageRepository,
         images_ids: list[ImageId],
     ) -> list[DistancedTriple]:
-
+        LOGGER.info("Extracting DINOv2 embeddings for %d images...", len(images_ids))
         dinov2_embeddings = extract_embeddings_from_images(
             self.dinov2_global_descriptor,
             (image_repository.load_image(image_id) for image_id in images_ids),
@@ -124,10 +143,11 @@ class SiftDistanceParer(BasePipelineStep):
 
         pairs = compute_cross_pairs(
             dinov2_embeddings,
-            cutoff_th=0.25,
-            distance_th=2,
-            min_pairs=1,
+            cutoff_th=self.cutoff_th,
+            distance_th=self.distance_th,
+            min_pairs=self.min_pairs,
         )
+        LOGGER.info("DINOv2 cross-pairs: %d candidate pairs", len(pairs))
         return pairs
 
     def _extract_sift_features(
@@ -136,15 +156,32 @@ class SiftDistanceParer(BasePipelineStep):
         images_ids: list[ImageId],
         pairs: list[DistancedTriple],
     ) -> list[DistancedTriple]:
+        LOGGER.info("Extracting SIFT features for %d images...", len(images_ids))
         kpts_descriptors = extract_sift_features(
             (image_repository.load_image(image_id) for image_id in images_ids),
             2024,
+            tqdm_kwargs={"desc": "Extract SIFT features"},
         )
+        if self.save_keypoints or self.save_descriptors:
+            for image_id, (kpts, descriptors) in zip(images_ids, kpts_descriptors):
+                if self.save_keypoints:
+                    image_repository.add_keypoints(image_id, kpts, name="sift")
+                if self.save_descriptors:
+                    image_repository.add_descriptors(image_id, descriptors, name="sift")
+
         images_sizes = {
             num: image_repository.load_image(image_id).shape[:2]
             for num, image_id in enumerate(images_ids)
         }
-        filtered_pairs = filter_validated_paris(pairs, kpts_descriptors, images_sizes)
+        filtered_pairs, validated_matches = filter_validated_paris(
+            pairs, kpts_descriptors, images_sizes
+        )
+        if self.save_matches:
+            for (st_idx, nd_idx), matches in validated_matches.items():
+                st_image_id = images_ids[st_idx]
+                nd_image_id = images_ids[nd_idx]
+                image_repository.add_matches(st_image_id, nd_image_id, matches, name="sift")
+
         return filtered_pairs
 
     @property
@@ -213,7 +250,11 @@ class SiftDistanceParer(BasePipelineStep):
             filtered_triples,
             image_ids,
         )
-
+        LOGGER.info(
+            "Pairs computed: %d MST pairs, %d possible pairs",
+            len(mst_pairs),
+            len(possible_pairs),
+        )
         return MstPairTriple(
             mst_pairs,
             possible_pairs,

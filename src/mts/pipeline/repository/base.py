@@ -209,21 +209,23 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
-    def add_keypoints(self, img_id: ImageId, keypoints: np.ndarray) -> None:
-        """Stores keypoints for an image.
+    def add_keypoints(self, img_id: ImageId, keypoints: np.ndarray, *, name: str = "keypoints") -> None:
+        """Stores a named set of keypoints for an image.
 
         Args:
             img_id: The image identifier.
             keypoints: Array of detected keypoints.
+            name: Name identifying the keypoint type (e.g. "sift", "superpoint").
         """
         pass
 
     @abstractmethod
-    def get_keypoints(self, img_id: ImageId) -> np.ndarray | None:
-        """Retrieves keypoints for an image.
+    def get_keypoints(self, img_id: ImageId, *, name: str = "keypoints") -> np.ndarray | None:
+        """Retrieves a named set of keypoints for an image.
 
         Args:
             img_id: The image identifier.
+            name: Name identifying the keypoint type.
 
         Returns:
             The keypoints array if available, otherwise None.
@@ -231,21 +233,23 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
-    def add_descriptors(self, img_id: ImageId, descriptors: np.ndarray) -> None:
-        """Stores local feature descriptors for an image.
+    def add_descriptors(self, img_id: ImageId, descriptors: np.ndarray, *, name: str = "descriptors") -> None:
+        """Stores a named set of local feature descriptors for an image.
 
         Args:
             img_id: The image identifier.
             descriptors: Array of local descriptors.
+            name: Name identifying the descriptor type (e.g. "sift", "superpoint").
         """
         pass
 
     @abstractmethod
-    def get_descriptors(self, img_id: ImageId) -> np.ndarray | None:
-        """Retrieves local feature descriptors for an image.
+    def get_descriptors(self, img_id: ImageId, *, name: str = "descriptors") -> np.ndarray | None:
+        """Retrieves a named set of local feature descriptors for an image.
 
         Args:
             img_id: The image identifier.
+            name: Name identifying the descriptor type.
 
         Returns:
             The descriptor array if available, otherwise None.
@@ -280,6 +284,8 @@ class BaseImageRepository(ABC):
         img_id1: ImageId,
         img_id2: ImageId,
         matches: np.ndarray,
+        *,
+        name: str = "matches",
     ) -> None:
         """Stores feature matches between two images.
 
@@ -287,6 +293,7 @@ class BaseImageRepository(ABC):
             img_id1: First image identifier.
             img_id2: Second image identifier.
             matches: Array of feature matches.
+            name: Name identifying the match type (e.g. "sift", "mast3r").
         """
         pass
 
@@ -295,12 +302,15 @@ class BaseImageRepository(ABC):
         self,
         img_id1: ImageId,
         img_id2: ImageId,
+        *,
+        name: str = "matches",
     ) -> np.ndarray | None:
         """Retrieves feature matches between two images.
 
         Args:
             img_id1: First image identifier.
             img_id2: Second image identifier.
+            name: Name identifying the match type.
 
         Returns:
             The matches array if available, otherwise None.

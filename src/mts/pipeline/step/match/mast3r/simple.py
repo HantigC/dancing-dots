@@ -56,12 +56,12 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         )
         for image_filepath, keypoints in keypoints_map.items():
             image_id = image_repository.get_image_id(Path(image_filepath))
-            image_repository.add_keypoints(image_id, keypoints)
+            image_repository.add_keypoints(image_id, keypoints, name="mast3r")
 
         for (st_image_filepath, nd_image_filepath), matches in matches_map.items():
             st_image_id = image_repository.get_image_id(Path(st_image_filepath))
             nd_image_id = image_repository.get_image_id(Path(nd_image_filepath))
-            image_repository.add_matches(st_image_id, nd_image_id, matches)
+            image_repository.add_matches(st_image_id, nd_image_id, matches, name="mast3r")
 
     @classmethod
     def from_checkpoint(
