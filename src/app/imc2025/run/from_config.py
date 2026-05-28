@@ -10,6 +10,7 @@ from omegaconf import OmegaConf
 from app.constants import DEBUG
 from app.imc2025.pipeline import ALL, IMC2025Pipeline
 from app.imc2025.prediction import load_from_csv, load_test_images, sample_to_csv
+from app.imc2025.run.types import RunType
 from app.logging import setup_file_logging
 from mts.core.types import PathLike
 from mts.helpers.imc import metric
@@ -32,12 +33,14 @@ def create_imc2025_from_cfg(cfg):
     )
     data_dirpath = Path(cfg.get("data_dirpath", "data"))
     cfg.data_dirpath = data_dirpath
-    is_train = cfg.get("is_train", True)
+    run_type = RunType(cfg.get("run_type", RunType.TRAIN))
     samples_filename = cfg.get("sample_filepath")
     if samples_filename:
         samples = load_from_csv(data_dirpath, samples_filename)
-    elif is_train:
+    elif run_type == RunType.TRAIN:
         samples = load_from_csv(data_dirpath, "train_labels.csv")
+    elif run_type == RunType.SUBMISSION:
+        samples = load_from_csv(data_dirpath, "sample_submission.csv")
     else:
         samples = load_test_images(data_dirpath)
 
@@ -75,7 +78,7 @@ def run_from_cfg(cfg) -> IMC2025Pipeline:
             datasets_names = ALL
         LOGGER.info("Running for %s datasets", str(datasets_names))
         imc2025_pipeline.run(datasets_names)
-        is_train = cfg.get("is_train", True)
+        run_type = RunType(cfg.get("run_type", RunType.TRAIN))
         submission_dest_dirpath = cfg.get("submission_dest_dirpath")
         submission_dest_dirpath = submission_dest_dirpath or imc2025_pipeline.project_dirpath
         submission_dest_dirpath = Path(submission_dest_dirpath)
@@ -84,12 +87,12 @@ def run_from_cfg(cfg) -> IMC2025Pipeline:
         sample_to_csv(imc2025_pipeline.samples, submission_filepath)
         data_dirpath = Path(cfg.data_dirpath)
 
-        if is_train:
+        if run_type == RunType.TRAIN:
             summary_dict = metric.score(
                 gt_csv=data_dirpath / "train_labels.csv",
                 user_csv=submission_filepath,
                 thresholds_csv=data_dirpath / "train_thresholds.csv",
-                mask_csv=None if is_train else data_dirpath / "mask.csv",
+                mask_csv=None,
                 inl_cf=0,
                 strict_cf=-1,
                 verbose=True,

@@ -1,2 +1,2 @@
-is_train: False
+run_type: submission
 sample_filepath: null

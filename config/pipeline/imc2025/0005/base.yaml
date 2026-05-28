@@ -7,7 +7,7 @@ description: |
 project_path: iterations
 data_dirpath: "data/image-matching-challenge-2025"
 sample_filepath: null
-is_train: True
+run_type: train
 origin: None
 git_commit: None
 datasets_names: null

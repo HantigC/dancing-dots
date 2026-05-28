@@ -91,7 +91,7 @@ def load_from_train(
     return load_from_df(df, data_dirpath / "train")
 
 
-def load_from_test(
+def load_from_submission(
     data_dirpath: PathLike,
     filename: str = "sample_submission.csv",
 ) -> DatasetSamples:
