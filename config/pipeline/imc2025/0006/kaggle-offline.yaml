@@ -1,0 +1,8 @@
+data_dirpath: "/kaggle/input/competitions/image-matching-challenge-2025-ongoing"
+submission_dest_dirpath: "/kaggle/working"
+
+pipeline_steps:
+  paring:
+    step:
+      dinov2_global_descriptor:
+        model_location: /kaggle/input/models/hantig/fb-dinov2/pytorch/default/1/snapshots/f9e44c814b77203eaa57a6bdbbd535f21ede1415
