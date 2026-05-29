@@ -63,20 +63,32 @@ def to_df(samples: DatasetSamples) -> pd.DataFrame:
 def load_from_df(
     df: pd.DataFrame,
     data_dirpath: PathLike,
+    skip: bool = True,
 ) -> DatasetSamples:
-    data_dirpath = Path(data_dirpath)
+    data_dirpath: Path = Path(data_dirpath)
     samples = {}
     for _, row in df.iterrows():
         if row.dataset not in samples:
             samples[row.dataset] = []
+        image_filepath = data_dirpath / row.dataset / row.image
+        if not image_filepath.exists():
+            if skip:
+                continue
+            else:
+                raise ValueError("File '%s' could not be found", image_filepath)
         samples[row.dataset].append(
             Prediction(
                 image_id=row.image_id,
                 dataset=row.dataset,
                 filename=row.image,
-                image_filepath=data_dirpath / row.dataset / row.image,
+                image_filepath=image_filepath,
             )
         )
+    samples = {
+        dataset_name: predictions
+        for dataset_name, predictions in samples.items()
+        if len(predictions) > 0
+    }
     return samples
 
 
