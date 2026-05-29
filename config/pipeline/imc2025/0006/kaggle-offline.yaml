@@ -1,6 +1,3 @@
-data_dirpath: "/kaggle/input/competitions/image-matching-challenge-2025-ongoing"
-submission_dest_dirpath: "/kaggle/working"
-
 pipeline_steps:
   paring:
     step:
