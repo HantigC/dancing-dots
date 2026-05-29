@@ -54,7 +54,10 @@ class IMC2025Pipeline:
         datasets_names = self._get_dataset_names(datasets_names)
         t0 = time.monotonic()
         for dataset_name in datasets_names:
-            self.run_for(dataset_name)
+            try:
+                self.run_for(dataset_name)
+            except Exception:
+                LOGGER.exception("Something happened for dataset '%s', skipping", dataset_name)
         elapsed = time.monotonic() - t0
         LOGGER.info("Pipeline finished in %.2f seconds (%.2f minutes)", elapsed, elapsed / 60)
 
