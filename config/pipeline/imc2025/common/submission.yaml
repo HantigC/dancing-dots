@@ -1,7 +1,2 @@
 run_type: submission
 sample_filepath: null
-
-data_dirpath: "/kaggle/input/competitions/image-matching-challenge-2025-ongoing"
-
-project_path: "/kaggle/working/iterations/"
-submission_dest_dirpath: "/kaggle/working/"

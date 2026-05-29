@@ -49,6 +49,7 @@ def to_df(samples: DatasetSamples) -> pd.DataFrame:
                 else _array_to_str(prediction.translation)
             )
             record = {
+                "image_id": prediction.image_id,
                 "dataset": prediction.dataset,
                 "scene": cluster_name,
                 "image": prediction.filename,
