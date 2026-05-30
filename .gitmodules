@@ -1,3 +1,6 @@
 [submodule "deps/submodules/asmk"]
 	path = deps/submodules/asmk
 	url = https://github.com/HantigC/asmk.git
+[submodule "deps/submodules/gim"]
+	path = deps/submodules/gim
+	url = https://github.com/HantigC/gim.git
