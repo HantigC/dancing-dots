@@ -68,6 +68,8 @@ def load_from_df(
     df: pd.DataFrame,
     data_dirpath: PathLike,
     skip: bool = True,
+    strict: bool = True,
+    load_pose: bool = False,
 ) -> DatasetSamples:
     data_dirpath: Path = Path(data_dirpath)
     samples = {}
@@ -79,13 +81,21 @@ def load_from_df(
             if skip:
                 continue
             else:
-                raise ValueError("File '%s' could not be found", image_filepath)
+                if strict:
+                    raise ValueError("File '%s' could not be found", image_filepath)
+        rotation, translation = None, None
+        if load_pose:
+            rotation = np.array(list(map(float, row.rotation_matrix.split(";")))).reshape((3, 3))
+            translation = np.array(list(map(float, row.translation_vector.split(";"))))
+
         samples[row.dataset].append(
             Prediction(
                 image_id=row.image_id,
                 dataset=row.dataset,
                 filename=row.image,
                 image_filepath=image_filepath,
+                rotation=rotation, 
+                translation=translation,
             )
         )
     samples = {
@@ -99,27 +109,48 @@ def load_from_df(
 def load_from_train(
     data_dirpath: PathLike,
     filename: str = "train_labels.csv",
+    skip: bool = True,
+    strict: bool = True,
+    load_pose: bool = False,
 ) -> tuple[DatasetSamples, pd.DataFrame]:
     data_dirpath = Path(data_dirpath)
     sample_submission_csv = data_dirpath / filename
     df = pd.read_csv(sample_submission_csv)
     df["image_id"] = df.dataset + "_" + df.image
-    return load_from_df(df, data_dirpath / "train"), df
+    return load_from_df(
+        df,
+        data_dirpath / "train",
+        skip=skip,
+        strict=strict,
+        load_pose=load_pose,
+    ), df
 
 
 def load_from_submission(
     data_dirpath: PathLike,
     filename: str = "sample_submission.csv",
+    skip: bool = True,
+    strict: bool = True,
+    load_pose: bool = False,
 ) -> tuple[DatasetSamples, pd.DataFrame]:
     data_dirpath = Path(data_dirpath)
     sample_submission_csv = data_dirpath / filename
     df = pd.read_csv(sample_submission_csv)
-    return load_from_df(df, data_dirpath / "test"), df
+    return load_from_df(
+        df,
+        data_dirpath / "test",
+        skip=skip,
+        strict=strict,
+        load_pose=load_pose,
+    ), df
 
 
 def load_from_csv(
     data_dirpath: PathLike,
     filename: str,
+    skip: bool = True,
+    strict: bool = True,
+    load_pose: bool = False,
 ) -> tuple[DatasetSamples, pd.DataFrame]:
     data_dirpath = Path(data_dirpath)
     csv_filepath = data_dirpath / filename
@@ -128,7 +159,13 @@ def load_from_csv(
     if "image_id" not in df.columns:
         df["image_id"] = df.dataset + "_" + df.image
         train_or_test = "train"
-    return load_from_df(df, data_dirpath / train_or_test), df
+    return load_from_df(
+        df,
+        data_dirpath / train_or_test,
+        skip=skip,
+        strict=strict,
+        load_pose=load_pose,
+    ), df
 
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
