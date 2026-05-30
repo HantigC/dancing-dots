@@ -1,0 +1,11 @@
+pipeline_steps:
+  embedder:
+    device: mps
+
+  feature_extractor:
+    device: mps
+  #   step:
+  #     batch_size: 1
+
+  kp_matching:
+    device: mps

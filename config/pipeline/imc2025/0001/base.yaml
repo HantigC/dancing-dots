@@ -1,7 +1,21 @@
 name: IMC2025
-description: Running reconstruction
+description: |
+  Use DINOv2 global descriptors for embedding
+  Use ALIKED for local keypoint extraction
+  Use CrossEmbeddingParerStep for pair creation
+  Use LightGlue for keypoint matching
+  Use ColmapReconstructionStep for incremental 3D reconstruction
+
 project_path: iterations
-is_train: True
+data_dirpath: "data/image-matching-challenge-2025"
+sample_filepath: null
+run_type: train
+origin: None
+git_commit: None
+datasets_names: null
+save_project_to_git: False
+submission_dest_dirpath: null
+
 
 pipeline_steps:
   embedder:
@@ -11,7 +25,7 @@ pipeline_steps:
       _target_: mts.pipeline.step.extract.embedding.base.GlobalDescriptorStep
       global_extractor:
         _target_: mts.core.embedder.dinov2.DinoV2GlobalDescriptors.from_pretrained
-        model_location: weights/dinov2/base
+        model_location: model-weights/fb-dinov2/snapshots/f9e44c814b77203eaa57a6bdbbd535f21ede1415
 
   feature_extractor:
     _target_: mts.pipeline.step.base.OnDeviceRunner
@@ -20,21 +34,21 @@ pipeline_steps:
       _target_: mts.pipeline.step.extract.kp.base.TorchExtractStep
       extractor:
         _target_: mts.core.extractor.aliked.AlikedExtractor
-        num_features: 1024
-        resize_to: 1024
+        num_features: 2048
+        resize_to: 640
 
-  image_paring:
-      _target_: mts.pipeline.step.pair.cdist.CrossEmbeddingParerStep
+  pairing:
+    _target_: mts.pipeline.step.pair.cdist.CrossEmbeddingParerStep
 
-  kp_matching: 
+  kp_matching:
     _target_: mts.pipeline.step.base.OnDeviceRunner
     device: cuda:0
     step:
       _target_: mts.pipeline.step.match.base.MatchingStep
       matcher:
-        _target_: mts.core.matcher.lg.LightGlueMatcher.from_config
+        _target_: mts.core.matching.lg.LightGlueMatcher.from_config
         feature_name: aliked
-        params: 
+        params:
           width_confidence: -1
           depth_confidence: -1
           mp: True
@@ -49,5 +63,5 @@ pipeline_steps:
 
 reconstruction_runner:
   create_pipeline_method: app.imc2025.pipeline.create_pipeline
-  create_repository_method: app.imc2025.pipeline.create_repository
+  create_repository_method: app.imc2025.pipeline.create_h5_repository
   create_pipeline_state_method: app.imc2025.pipeline.create_pipeline_state
