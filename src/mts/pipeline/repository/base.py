@@ -31,6 +31,29 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
+    def update_repository_metadata(self, **kwargs) -> None:
+        """Updates existing repository-level metadata keys.
+
+        Raises:
+            Exception: If a metadata key does not exist (implementation-specific).
+        """
+        pass
+
+    @abstractmethod
+    def upsert_repository_metadata(self, **kwargs) -> None:
+        """Inserts or updates repository-level metadata keys."""
+        pass
+
+    @abstractmethod
+    def get_repository_metadata(self, name: str) -> Any:
+        """Retrieves a single repository-level metadata value by key.
+
+        Returns:
+            The stored value, or None if not found.
+        """
+        pass
+
+    @abstractmethod
     def add_image(self, filepath: str) -> ImageId:
         """Adds an image to the repository.
 

@@ -42,6 +42,18 @@ class ImageRepository(BaseImageRepository):
                 )
             self._repository_metadata[k] = v
 
+    def update_repository_metadata(self, **kwargs):
+        for k, v in kwargs.items():
+            if k not in self._repository_metadata:
+                raise NotFoundException(f"{k} does not exist inside repository metadata")
+            self._repository_metadata[k] = v
+
+    def upsert_repository_metadata(self, **kwargs):
+        self._repository_metadata.update(kwargs)
+
+    def get_repository_metadata(self, name: str):
+        return self._repository_metadata.get(name)
+
     def add_image(self, filepath: str) -> int:
         """Add an image filepath and return its integer ID."""
         if filepath in self._images_filepath:

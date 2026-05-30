@@ -1,11 +1,13 @@
 import logging
 from sqlite3 import IntegrityError
 
+import numpy as np
 from tqdm.auto import tqdm
 
 from mts.core.types import PathLike
 from mts.helpers.colmap.database import COLMAPDatabase
 from mts.helpers.colmap.h5_to_db import CameraModel, create_camera
+from mts.pipeline.repository.base import BaseImageRepository
 from mts.pipeline.repository.inmemeory import ImageRepository
 
 LOGGER = logging.getLogger(__name__)
@@ -42,7 +44,7 @@ def export_to_colmap(
         db.commit()
 
         LOGGER.info("Commit the exporting to colmap db")
-    except BaseException:
+    except Exception:
         raise
     finally:
         db.close()
@@ -50,12 +52,13 @@ def export_to_colmap(
 
 
 def add_keypoints(
-    image_repository: ImageRepository,
+    image_repository: BaseImageRepository,
     db: COLMAPDatabase,
     camera_model: str,
     single_camera: bool = False,
     keypoints_name: str = "keypoints",
     descriptors_name: str = "descriptors",
+    save_descriptors: bool = False,
 ) -> dict[int, int]:
     LOGGER.info("Export keypoints and descriptors")
     camera_id = None
@@ -80,17 +83,29 @@ def add_keypoints(
 
         if keypoints is not None:
             db.add_keypoints(db_image_id, keypoints)
+            try:
+                eq_mask = db.select_kp(db_image_id) == keypoints
+            except Exception:
+                LOGGER.warning("Keypoints are not saved correctly")
+            else:
+                if not eq_mask.all():
+                    LOGGER.warning("Keypoints are not saved the same to colmap")
 
-        if descriptors is not None:
-            db.add_descriptors(image_id, descriptors)
+        if save_descriptors:
+            if descriptors is not None:
+                db.add_descriptors(image_id, descriptors)
         id_to_db_id[image_id] = db_image_id
+
+    image_repository.add_repository_metadata(
+        id_to_db_id=np.array(list(id_to_db_id.items()))
+    )
 
     return id_to_db_id
 
 
 def add_matches(
     id_to_db_id: dict[int, int],
-    image_repository: ImageRepository,
+    image_repository: BaseImageRepository,
     db: COLMAPDatabase,
     matches_name: str = "matches",
 ) -> None:

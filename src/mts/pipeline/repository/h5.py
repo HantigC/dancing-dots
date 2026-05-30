@@ -124,17 +124,42 @@ class H5ImageRepository(BaseImageRepository):
             grp = h5_read.get("repository_metadata")
             if grp is None:
                 return None
+            if name in grp:
+                return grp[name][:]
             value = grp.attrs.get(name)
             if value is not None:
                 value = json.loads(value)
         return value
 
+    def _repo_meta_key_exists(self, grp, name: str) -> bool:
+        return name in grp or name in grp.attrs
+
+    def _repo_meta_write(self, grp, name: str, value):
+        if isinstance(value, np.ndarray):
+            if name in grp:
+                del grp[name]
+            grp.create_dataset(name, data=value)
+        else:
+            grp.attrs[name] = json.dumps(value)
+
     def add_repository_metadata(self, **kwargs):
         with self:
             for k, v in kwargs.items():
-                if k in self._repo_meta.attrs:
+                if self._repo_meta_key_exists(self._repo_meta, k):
                     raise ValueError(f"{k} already exists")
-                self._repo_meta.attrs[k] = json.dumps(v)
+                self._repo_meta_write(self._repo_meta, k, v)
+
+    def update_repository_metadata(self, **kwargs):
+        with self:
+            for k, v in kwargs.items():
+                if not self._repo_meta_key_exists(self._repo_meta, k):
+                    raise ValueError(f"{k} does not exist")
+                self._repo_meta_write(self._repo_meta, k, v)
+
+    def upsert_repository_metadata(self, **kwargs):
+        with self:
+            for k, v in kwargs.items():
+                self._repo_meta_write(self._repo_meta, k, v)
 
     def add_image(self, filepath: PathLike) -> int:
         with self:
