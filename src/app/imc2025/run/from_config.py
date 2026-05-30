@@ -9,7 +9,12 @@ from omegaconf import OmegaConf
 
 from app.constants import DEBUG
 from app.imc2025.pipeline import ALL, IMC2025Pipeline
-from app.imc2025.prediction import load_from_csv, load_test_images, sample_to_csv
+from app.imc2025.prediction import (
+    append_samples_to_csv,
+    load_from_csv,
+    load_from_submission,
+    load_test_images,
+)
 from app.imc2025.run.types import RunType
 from app.logging import setup_file_logging
 from mts.core.types import PathLike
@@ -36,13 +41,13 @@ def create_imc2025_from_cfg(cfg):
     run_type = RunType(cfg.get("run_type", RunType.TRAIN))
     samples_filename = cfg.get("sample_filepath")
     if samples_filename:
-        samples = load_from_csv(data_dirpath, samples_filename)
+        samples, df = load_from_csv(data_dirpath, samples_filename)
     elif run_type == RunType.TRAIN:
-        samples = load_from_csv(data_dirpath, "train_labels.csv")
+        samples, df = load_from_csv(data_dirpath, "train_labels.csv")
     elif run_type == RunType.SUBMISSION:
-        samples = load_from_csv(data_dirpath, "sample_submission.csv")
+        samples, df = load_from_submission(data_dirpath)
     else:
-        samples = load_test_images(data_dirpath)
+        samples, df = load_test_images(data_dirpath)
 
     imc2025_pipeline = IMC2025Pipeline(
         last_project_iteration.iteration_dirpath,
@@ -52,11 +57,11 @@ def create_imc2025_from_cfg(cfg):
         create_pipeline_state=create_pipeline_state,
     )
     cfg.origin = imc2025_pipeline.project_dirpath
-    return imc2025_pipeline, last_project_iteration
+    return imc2025_pipeline, last_project_iteration, df
 
 
 def run_from_cfg(cfg) -> IMC2025Pipeline:
-    imc2025_pipeline, last_project_iteration = create_imc2025_from_cfg(cfg)
+    imc2025_pipeline, last_project_iteration, df = create_imc2025_from_cfg(cfg)
     with last_project_iteration:
         setup_file_logging(imc2025_pipeline.project_dirpath)
         LOGGER.info("Running the pipeline with:\n%s", OmegaConf.to_yaml(cfg))
@@ -80,11 +85,17 @@ def run_from_cfg(cfg) -> IMC2025Pipeline:
         imc2025_pipeline.run(datasets_names)
         run_type = RunType(cfg.get("run_type", RunType.TRAIN))
         submission_dest_dirpath = cfg.get("submission_dest_dirpath")
-        submission_dest_dirpath = submission_dest_dirpath or imc2025_pipeline.project_dirpath
+        submission_dest_dirpath = (
+            submission_dest_dirpath or imc2025_pipeline.project_dirpath
+        )
         submission_dest_dirpath = Path(submission_dest_dirpath)
 
         submission_filepath = submission_dest_dirpath / "submission.csv"
-        sample_to_csv(imc2025_pipeline.samples, submission_filepath)
+        append_samples_to_csv(
+            imc2025_pipeline.samples,
+            df,
+            submission_filepath,
+        )
         data_dirpath = Path(cfg.data_dirpath)
 
         if run_type == RunType.TRAIN:

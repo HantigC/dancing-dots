@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -5,6 +6,8 @@ import numpy as np
 import pandas as pd
 
 from mts.core.types import PathLike
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -96,25 +99,28 @@ def load_from_df(
 def load_from_train(
     data_dirpath: PathLike,
     filename: str = "train_labels.csv",
-) -> DatasetSamples:
+) -> tuple[DatasetSamples, pd.DataFrame]:
     data_dirpath = Path(data_dirpath)
     sample_submission_csv = data_dirpath / filename
     df = pd.read_csv(sample_submission_csv)
     df["image_id"] = df.dataset + "_" + df.image
-    return load_from_df(df, data_dirpath / "train")
+    return load_from_df(df, data_dirpath / "train"), df
 
 
 def load_from_submission(
     data_dirpath: PathLike,
     filename: str = "sample_submission.csv",
-) -> DatasetSamples:
+) -> tuple[DatasetSamples, pd.DataFrame]:
     data_dirpath = Path(data_dirpath)
     sample_submission_csv = data_dirpath / filename
     df = pd.read_csv(sample_submission_csv)
-    return load_from_df(df, data_dirpath / "test")
+    return load_from_df(df, data_dirpath / "test"), df
 
 
-def load_from_csv(data_dirpath: PathLike, filename: str) -> DatasetSamples:
+def load_from_csv(
+    data_dirpath: PathLike,
+    filename: str,
+) -> tuple[DatasetSamples, pd.DataFrame]:
     data_dirpath = Path(data_dirpath)
     csv_filepath = data_dirpath / filename
     df = pd.read_csv(csv_filepath)
@@ -122,7 +128,7 @@ def load_from_csv(data_dirpath: PathLike, filename: str) -> DatasetSamples:
     if "image_id" not in df.columns:
         df["image_id"] = df.dataset + "_" + df.image
         train_or_test = "train"
-    return load_from_df(df, data_dirpath / train_or_test)
+    return load_from_df(df, data_dirpath / train_or_test), df
 
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
@@ -151,6 +157,28 @@ def load_test_images(
         if predictions:
             samples[dataset_dir.name] = predictions
     return samples
+
+
+def append_samples_to_csv(
+    samples: DatasetSamples,
+    df: pd.DataFrame,
+    filepath: PathLike,
+) -> None:
+    samples_df = to_df(samples)
+    df = df.copy()
+    df["rotation_matrix"] = _none_to_str(9)
+    df["translation_vector"] = _none_to_str(3)
+    submission_df = (
+        samples_df.set_index("image_id")
+        .combine_first(df.set_index("image_id"))
+        .reset_index()
+    )
+    LOGGER.info("Saving submission to %s", str(filepath))
+    submission_df.to_csv(
+        filepath,
+        sep=",",
+        index=False,
+    )
 
 
 def sample_to_csv(
