@@ -14,6 +14,7 @@ from mts.core.scene_graph.nx import mst_pair_distanced_triple
 from mts.core.types import DistancedTriple, ImageId, PairType, PathLike
 from mts.pipeline.repository.base import BaseImageRepository
 from mts.pipeline.step.base import BasePipelineStep
+from mts.pipeline.step.pair.common import extract_possible_pairs
 from mts.pipeline.step.pair.mast3r import MstPairTriple
 
 LOGGER = logging.getLogger(__name__)
@@ -180,7 +181,9 @@ class SiftDistanceParer(BasePipelineStep):
             for (st_idx, nd_idx), matches in validated_matches.items():
                 st_image_id = images_ids[st_idx]
                 nd_image_id = images_ids[nd_idx]
-                image_repository.add_matches(st_image_id, nd_image_id, matches, name="sift")
+                image_repository.add_matches(
+                    st_image_id, nd_image_id, matches, name="sift"
+                )
 
         return filtered_pairs
 
@@ -207,20 +210,6 @@ class SiftDistanceParer(BasePipelineStep):
             mst_pairs.append((st_image_id, nd_image_id))
         return mst_pairs
 
-    def _extract_possible_pairs(
-        self,
-        filtered_triples: list[DistancedTriple],
-        image_ids: list[int],
-    ) -> list[PairType[int]]:
-        possible_pairs = []
-        for distance_triple in filtered_triples:
-            st_idx, nd_idx = distance_triple.st, distance_triple.nd
-            st_image_id = image_ids[st_idx]
-            nd_image_id = image_ids[nd_idx]
-            st_image_id, nd_image_id = sorted((st_image_id, nd_image_id))
-            possible_pairs.append((st_image_id, nd_image_id))
-        return possible_pairs
-
     def _compute_pairs(self, image_repository: BaseImageRepository) -> MstPairTriple:
         filepaths_as_str_to_ids_map = {
             str(image_repository.get_filepath(image_id)): image_id
@@ -246,7 +235,7 @@ class SiftDistanceParer(BasePipelineStep):
             filtered_triples,
             num_to_ids_map,
         )
-        possible_pairs = self._extract_possible_pairs(
+        possible_pairs = extract_possible_pairs(
             filtered_triples,
             image_ids,
         )

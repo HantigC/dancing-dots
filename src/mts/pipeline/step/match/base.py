@@ -3,7 +3,7 @@ import logging
 import torch
 from tqdm.auto import tqdm
 
-from mts.core.matcher.base import BaseMatcher
+from mts.core.matching.base import BaseMatcher
 from mts.pipeline.repository.inmemeory import ImageRepository
 from mts.pipeline.step.base import BasePipelineStep, use_image_repository
 

@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from functools import wraps
 from typing import Any, Callable, Hashable
@@ -9,6 +10,8 @@ from torch import nn
 from mts.core.types import PathLike, StateType
 from mts.helpers.torch.nn import DeviceMixin
 from mts.pipeline.repository.inmemeory import ImageRepository
+
+LOGGER = logging.getLogger(__name__)
 
 
 class BasePipelineStep(ABC, DeviceMixin, nn.Module):
@@ -40,6 +43,12 @@ class OnDeviceRunner(BasePipelineStep):
         input: Any,
         state: StateType,
     ) -> Any:
+
+        LOGGER.info(
+            "Running step '%s' on device %s",
+            self.step.__class__.__name__,
+            self._run_on_device,
+        )
         prev_device = self.step.device
         self.step.to(self._run_on_device)
         result = self.step.run(
@@ -93,7 +102,6 @@ class StateKeyError(Exception):
 
 
 class State:
-
     def __init__(self) -> None:
         self._state_map: dict[Hashable, Any] = {}
 
@@ -118,6 +126,7 @@ def run_pipeline(
 ) -> Any:
     state = state or {}
     for step in steps:
+        LOGGER.info("Running step '%s'", step.__class__.__name__)
         input = step.run(
             image_repository=image_repository,
             input=input,

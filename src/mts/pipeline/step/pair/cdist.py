@@ -5,6 +5,7 @@ from mts.core.pair.cross import compute_cross_pairs
 from mts.core.types import ImageId, PairType
 from mts.pipeline.repository.inmemeory import ImageRepository
 from mts.pipeline.step.base import BasePipelineStep, use_image_repository
+from mts.pipeline.step.pair.common import extract_possible_pairs
 
 LOGGER = logging.getLogger(__name__)
 
@@ -35,9 +36,12 @@ class CrossEmbeddingParerStep(BasePipelineStep):
     ) -> list[PairType[ImageId]]:
         if image_repository.images_num() < self.min_images:
             return list(it.combinations(image_repository.image_ids(), 2))
+        image_ids = list(image_repository.image_ids())
         image_embeddings = [
-            image_repository.get_global_descriptor(image_id)
-            for image_id in image_repository.image_ids()
+            image_repository.get_global_descriptor(
+                image_id,
+            )
+            for image_id in image_ids
         ]
         pairs = compute_cross_pairs(
             image_embeddings,
@@ -45,4 +49,5 @@ class CrossEmbeddingParerStep(BasePipelineStep):
             self.distance_th,
             self.min_pairs,
         )
-        return pairs
+        possible_pairs = extract_possible_pairs(pairs, image_ids)
+        return possible_pairs
