@@ -412,6 +412,7 @@ dependencies = [
     { name = "dust3r" },
     { name = "einops" },
     { name = "faiss-cpu" },
+    { name = "gim" },
     { name = "h5py" },
     { name = "hydra-core" },
     { name = "kornia" },
@@ -459,6 +460,7 @@ requires-dist = [
     { name = "dust3r", path = "deps/whls/dust3r-0.1.0-py3-none-any.whl" },
     { name = "einops", specifier = ">=0.8.1" },
     { name = "faiss-cpu", specifier = ">=1.13.2" },
+    { name = "gim", directory = "deps/submodules/gim" },
     { name = "h5py", specifier = "==3.16.0" },
     { name = "hydra-core", specifier = ">=1.3.2" },
     { name = "kagglehub", marker = "extra == 'kaggle'", specifier = ">=0.3" },
@@ -666,6 +668,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/09/6a/37e6b70c5bda3161e40265861e63b64a86bfc6ca6a8f1c35328a675c84fd/gdown-5.2.0.tar.gz", hash = "sha256:2145165062d85520a3cd98b356c9ed522c5e7984d408535409fd46f94defc787", size = 284647, upload-time = "2024-05-12T06:45:12.725Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/70/e07c381e6488a77094f04c85c9caf1c8008cdc30778f7019bc52e5285ef0/gdown-5.2.0-py3-none-any.whl", hash = "sha256:33083832d82b1101bdd0e9df3edd0fbc0e1c5f14c9d8c38d2a35bf1683b526d6", size = 18235, upload-time = "2024-05-12T06:45:10.017Z" },
+]
+
+[[package]]
+name = "gim"
+version = "0.1.0"
+source = { directory = "deps/submodules/gim" }
+dependencies = [
+    { name = "einops" },
+    { name = "torch" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "einops", specifier = ">=0.8.1" },
+    { name = "torch", specifier = ">=2.5.0" },
 ]
 
 [[package]]
