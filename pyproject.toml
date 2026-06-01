@@ -5,18 +5,13 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "asmk",
     "build>=1.4.0",
     "click>=8.3.3",
-    "croco",
-    "dust3r",
     "einops>=0.8.1",
     "faiss-cpu>=1.13.2",
     "h5py==3.16.0",
     "hydra-core>=1.3.2",
     "kornia>=0.8.2",
-    "lightglue",
-    "mast3r",
     "pillow==12.0.0",
     "nbformat==5.10.4",
     "more-itertools>=10.8.0",
@@ -30,7 +25,15 @@ dependencies = [
     "transformers==4.57.1",
     "trimesh>=4.0.0",
     "manifold3d>=3.0.0",
+    # Local packages
+    # wheels
+    "croco",
+    "dust3r",
+    "mast3r",
+    # submodules
     "gim",
+    "lightglue",
+    "asmk",
 ]
 
 [project.optional-dependencies]
@@ -52,6 +55,9 @@ dev = [
 ]
 [tool.uv]
 package = true
+override-dependencies = [
+    "lightglue",
+]
 
 [tool.uv.extra-build-dependencies]
 asmk = [
@@ -71,9 +77,9 @@ where = ["src"]
 
 [tool.uv.sources]
 hloc = { git = "https://github.com/cvg/Hierarchical-Localization.git" }
-lightglue = { git = "git+https://github.com/cvg/LightGlue"}
 croco = { path = "deps/whls/croco-0.1.2-py3-none-any.whl" }
 dust3r = { path = "deps/whls/dust3r-0.1.0-py3-none-any.whl" }
 mast3r = { path = "deps/whls/mast3r-0.1.0-py3-none-any.whl" }
 asmk = { path = "deps/submodules/asmk" }
-gim = { path = "deps/submodules/gim" }
+lightglue = { path = "deps/submodules/lightglue", editable = true}
+gim = { path = "deps/submodules/gim", editable = true }

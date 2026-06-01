@@ -4,3 +4,6 @@
 [submodule "deps/submodules/gim"]
 	path = deps/submodules/gim
 	url = https://github.com/HantigC/gim.git
+[submodule "deps/deps/submodules/lightglue"]
+	path = deps/deps/submodules/lightglue
+	url = https://github.com/HantigC/LightGlue.git
