@@ -1,0 +1,4 @@
+pipeline_steps:
+  pairing:
+    max_pairs_per_image: 30
+    max_pairs: 2000

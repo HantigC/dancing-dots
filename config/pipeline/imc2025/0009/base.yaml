@@ -1,0 +1,74 @@
+name: IMC2025
+description: |
+  Use NetVLAD global descriptors for embedding
+  Use ALIKED for local keypoint extraction
+  Use CrossEmbeddingParerStep for pair creation
+  Use LightGlue for keypoint matching
+  Use ColmapReconstructionStep for incremental 3D reconstruction
+
+project_path: iterations
+data_dirpath: "data/image-matching-challenge-2025"
+sample_filepath: null
+run_type: train
+origin: None
+git_commit: None
+datasets_names: null
+save_project_to_git: False
+submission_dest_dirpath: null
+
+
+pipeline_steps:
+  embedder:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.extract.embedding.base.GlobalDescriptorStep
+      global_extractor:
+        _target_: mts.core.embedder.vlad.NetVladEmbedding
+        model_location: model-weights/net-vlad
+
+  feature_extractor:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.extract.kp.base.TorchExtractStep
+      extractor:
+        _target_: mts.core.extractor.aliked.AlikedExtractor
+        num_features: 2048
+        resize_to: 640
+        weights: model-weights/kornia/aliked-n16.pth
+
+  pairing:
+    _target_: mts.pipeline.step.pair.cdist.CrossEmbeddingParerStep
+    cutoff_th: 1.25
+    distance_th: 10
+    min_pairs: 1
+    max_pairs_per_image: 30
+    max_pairs: 2000
+
+  kp_matching:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.match.base.MatchingStep
+      matcher:
+        _target_: mts.core.matching.lg.LightGlueMatcher.from_config
+        feature_name: aliked
+        weights: model-weights/kornia/aliked_lightglue_v0-1_arxiv-pth
+        params:
+          width_confidence: -1
+          depth_confidence: -1
+          mp: True
+
+  reconstruction:
+    _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep
+    mapper_options:
+      _target_: mts.helpers.colmap.options.create_incremental_pipeline_options
+      min_model_size: 3
+      max_num_models: 25
+
+
+reconstruction_runner:
+  create_pipeline_method: app.imc2025.pipeline.create_pipeline
+  create_repository_method: app.imc2025.pipeline.create_h5_repository
+  create_pipeline_state_method: app.imc2025.pipeline.create_pipeline_state
