@@ -114,6 +114,7 @@ def _worker(
         while True:
             dataset_name = dataset_queue.get()
             if dataset_name is _DONE:
+                LOGGER.info("[worker %d / %s] is DONe", rank, device)
                 break
 
             LOGGER.info("[worker %d / %s] starting: %s", rank, device, dataset_name)

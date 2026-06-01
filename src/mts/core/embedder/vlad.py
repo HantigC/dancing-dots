@@ -1,7 +1,8 @@
 import numpy as np
 import torch
-from hloc.extractors import netvlad
 from torch import nn
+
+from mts.core.model.netvald import NetVLAD
 
 from .base import BaseEmbedder
 
@@ -19,7 +20,7 @@ class NetVladEmbedding(
             cfg = {}
         if model_location is not None:
             torch.hub.set_dir(model_location)
-        self.net_vlad = netvlad.NetVLAD(cfg)
+        self.net_vlad = NetVLAD(cfg)
 
     def embed_image(self, img: np.ndarray | torch.Tensor) -> torch.Tensor:
         img_t = self.img_to_vlad(img)
