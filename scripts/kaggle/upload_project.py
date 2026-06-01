@@ -21,6 +21,8 @@ IGNORE_PATTERNS = [
     "runs/",
     "tmp/",
     # local tooling
+
+    "**/.venv/",
     ".venv/",
     "kaggle/",
     "ipynbs/",
