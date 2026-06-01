@@ -13,16 +13,13 @@ dependencies = [
     "hydra-core>=1.3.2",
     "kornia>=0.8.2",
     "pillow==12.0.0",
-    "nbformat==5.10.4",
     "more-itertools>=10.8.0",
     "numpy==2.3.4",
     "pandas==2.3.3",
-    "py3nvml==0.2.7",
     "pycolmap==3.13.0",
     "shapely==2.1.2",
     "torch==2.5",
     "tqdm>=4.67.1",
-    "transformers==4.57.1",
     "trimesh>=4.0.0",
     "manifold3d>=3.0.0",
     # Local packages
@@ -46,6 +43,9 @@ build = [
     "setuptools>=80.9.0",
 ]
 dev = [
+    "py3nvml==0.2.7",
+    "nbformat==5.10.4",
+    "transformers==4.57.1",
     "hloc",
     "cython>=3.2.4",
     "ipykernel>=7.1.0",

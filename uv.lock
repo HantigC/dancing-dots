@@ -547,16 +547,13 @@ dependencies = [
     { name = "manifold3d" },
     { name = "mast3r" },
     { name = "more-itertools" },
-    { name = "nbformat" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "pillow" },
-    { name = "py3nvml" },
     { name = "pycolmap" },
     { name = "shapely" },
     { name = "torch" },
     { name = "tqdm" },
-    { name = "transformers" },
     { name = "trimesh" },
 ]
 
@@ -574,8 +571,11 @@ dev = [
     { name = "hloc" },
     { name = "ipykernel" },
     { name = "matplotlib" },
+    { name = "nbformat" },
     { name = "pip" },
     { name = "plotly" },
+    { name = "py3nvml" },
+    { name = "transformers" },
 ]
 
 [package.metadata]
@@ -596,16 +596,13 @@ requires-dist = [
     { name = "manifold3d", specifier = ">=3.0.0" },
     { name = "mast3r", path = "deps/whls/mast3r-0.1.0-py3-none-any.whl" },
     { name = "more-itertools", specifier = ">=10.8.0" },
-    { name = "nbformat", specifier = "==5.10.4" },
     { name = "numpy", specifier = "==2.3.4" },
     { name = "pandas", specifier = "==2.3.3" },
     { name = "pillow", specifier = "==12.0.0" },
-    { name = "py3nvml", specifier = "==0.2.7" },
     { name = "pycolmap", specifier = "==3.13.0" },
     { name = "shapely", specifier = "==2.1.2" },
     { name = "torch", specifier = "==2.5" },
     { name = "tqdm", specifier = ">=4.67.1" },
-    { name = "transformers", specifier = "==4.57.1" },
     { name = "trimesh", specifier = ">=4.0.0" },
 ]
 provides-extras = ["kaggle"]
@@ -617,8 +614,11 @@ dev = [
     { name = "hloc", git = "https://github.com/cvg/Hierarchical-Localization.git" },
     { name = "ipykernel", specifier = ">=7.1.0" },
     { name = "matplotlib", specifier = ">=3.10.7" },
+    { name = "nbformat", specifier = "==5.10.4" },
     { name = "pip", specifier = ">=25.3" },
     { name = "plotly", specifier = "==6.4.0" },
+    { name = "py3nvml", specifier = "==0.2.7" },
+    { name = "transformers", specifier = "==4.57.1" },
 ]
 
 [[package]]
