@@ -3,3 +3,13 @@ pipeline_steps:
     step:
       global_extractor:
         model_location: /kaggle/input/models/hantig/fb-dinov2/pytorch/default/1/snapshots/f9e44c814b77203eaa57a6bdbbd535f21ede1415
+
+  feature_extractor:
+    step:
+      extractor:
+        weights: /kaggle/input/models/hantig/kornia/pytorch/default/1/aliked-n16.pth
+
+  kp_matching:
+    step:
+      matcher:
+        weights: /kaggle/input/models/hantig/kornia/pytorch/default/1/aliked_lightglue_v0-1_arxiv-pth
