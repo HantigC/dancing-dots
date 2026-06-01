@@ -112,7 +112,7 @@ def _worker(
     completed: DatasetSamples = {}
     try:
         while True:
-            dataset_name = dataset_queue.get()
+            dataset_name = dataset_queue.get(timeout=60)
             if dataset_name is _DONE:
                 LOGGER.info("[worker %d / %s] is DONe", rank, device)
                 break
