@@ -31,5 +31,5 @@ class LightGlueMatcher(
         return dists, idxs 
 
     @classmethod
-    def from_config(cls, feature_name: str, params: dict | None = None) -> LightGlueMatcher:
+    def from_config(cls, feature_name: str, **params ) -> LightGlueMatcher:
         return cls(KF.LightGlueMatcher(feature_name, params))

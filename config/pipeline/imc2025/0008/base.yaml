@@ -1,9 +1,8 @@
 name: IMC2025
 description: |
-  Use DINOv2 global descriptors for embedding
-  Use ALIKED for local keypoint extraction
-  Use CrossEmbeddingParerStep for pair creation
-  Use LightGlue for keypoint matching
+  Use DINOv2 for global embeddings and pair creation via CrossEmbeddingParerStep
+  Use TorchExtractStep with ALIKED for local keypoint/descriptor extraction
+  Use LightGlueMatchStep (lightglue library) for feature matching
   Use ColmapReconstructionStep for incremental 3D reconstruction
 
 project_path: iterations
@@ -18,7 +17,7 @@ submission_dest_dirpath: null
 
 
 pipeline_steps:
-  embedder:
+  global_embedding:
     _target_: mts.pipeline.step.base.OnDeviceRunner
     device: cuda:0
     step:
@@ -27,41 +26,48 @@ pipeline_steps:
         _target_: mts.core.embedder.dinov2.DinoV2GlobalDescriptors.from_pretrained
         model_location: model-weights/fb-dinov2/snapshots/f9e44c814b77203eaa57a6bdbbd535f21ede1415
 
-  feature_extractor:
+  pairing:
+    _target_: mts.pipeline.step.pair.cdist.CrossEmbeddingParerStep
+    min_images: 20
+    cutoff_th: 0.6
+    distance_th: 1000
+    min_pairs: 20
+
+  kp_extraction:
     _target_: mts.pipeline.step.base.OnDeviceRunner
     device: cuda:0
     step:
       _target_: mts.pipeline.step.extract.kp.base.TorchExtractStep
+      keypoints_name: aliked
+      descriptors_name: aliked
       extractor:
         _target_: mts.core.extractor.aliked.AlikedExtractor
         num_features: 2048
-        resize_to: 640
+        resize_to: 1024
         weights: model-weights/kornia/aliked-n16.pth
-
-  pairing:
-    _target_: mts.pipeline.step.pair.cdist.CrossEmbeddingParerStep
 
   kp_matching:
     _target_: mts.pipeline.step.base.OnDeviceRunner
     device: cuda:0
     step:
-      _target_: mts.pipeline.step.match.base.MatchingStep
-      matcher:
-        _target_: mts.core.matching.lg.LightGlueMatcher.from_config
-        feature_name: aliked
-        weights: model-weights/kornia/aliked_lightglue_v0-1_arxiv-pth
-        params:
-          width_confidence: -1
-          depth_confidence: -1
-          mp: True
+      _target_: mts.pipeline.step.match.lg.LightGlueMatchStep
+      features: aliked
+      weights: model-weights/kornia/aliked_lightglue_v0-1_arxiv-pth
+      keypoints_name: aliked
+      descriptors_name: aliked
+      matches_name: lightglue
+      min_matches: 15
+      reuse: true
 
   reconstruction:
     _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep
+    keypoints_name: aliked
+    descriptors_name: aliked
+    matches_name: lightglue
     mapper_options:
       _target_: mts.helpers.colmap.options.create_incremental_pipeline_options
       min_model_size: 3
       max_num_models: 25
-
 
 reconstruction_runner:
   create_pipeline_method: app.imc2025.pipeline.create_pipeline

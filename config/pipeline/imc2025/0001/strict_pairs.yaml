@@ -3,3 +3,5 @@ pipeline_steps:
     cutoff_th: 0.4
     distance_th: 0.5
     min_pairs: 1
+    max_pairs_per_image: 30
+    max_pairs: 2000

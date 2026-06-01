@@ -1,8 +1,7 @@
 import numpy as np
-from torch import nn
-from hloc.extractors import netvlad
 import torch
-import gc
+from hloc.extractors import netvlad
+from torch import nn
 
 from .base import BaseEmbedder
 
@@ -14,12 +13,13 @@ class NetVladEmbedding(
         torch.Tensor,
     ],
 ):
-    def __init__(self, cfg=None, device=torch.device("cuda:0")) -> None:
+    def __init__(self, cfg=None, model_location: str | None = None) -> None:
         super().__init__()
         if cfg is None:
             cfg = {}
-        self.net_vlad = netvlad.NetVLAD(cfg).to(device)
-        self.device = device
+        if model_location is not None:
+            torch.hub.set_dir(model_location)
+        self.net_vlad = netvlad.NetVLAD(cfg)
 
     def embed_image(self, img: np.ndarray | torch.Tensor) -> torch.Tensor:
         img_t = self.img_to_vlad(img)
@@ -44,5 +44,5 @@ class NetVladEmbedding(
         img = img / 255.0
         if img.ndim == 3:
             img.unsqueeze_(0)
-        img = img.permute(0, 3, 1, 2)
+        # img = img.permute(0, 3, 1, 2)
         return img

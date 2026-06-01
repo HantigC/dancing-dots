@@ -20,7 +20,7 @@ def to(
         return [to(value, dtype, device) for value in tensor_collection]
     elif isinstance(tensor_collection, tuple):
         return tuple(to(value, dtype, device) for value in tensor_collection)
-    raise ValueError(f"`{tensor_collection.__class__.__name__}` not supported")
+    return tensor_collection
 
 
 def to_2d(

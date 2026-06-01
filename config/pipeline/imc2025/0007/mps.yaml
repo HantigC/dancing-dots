@@ -1,0 +1,7 @@
+pipeline_steps:
+  global_embedding:
+    device: mps
+  kp_extraction:
+    device: mps
+  kp_matching:
+    device: mps

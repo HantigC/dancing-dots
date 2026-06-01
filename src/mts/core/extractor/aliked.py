@@ -5,10 +5,13 @@ from mts.core.extractor.base import BaseExtractor
 
 
 class AlikedExtractor(BaseExtractor):
-    def __init__(self, num_features, resize_to) -> None:
+    def __init__(self, num_features, resize_to, weights: str | None = None,) -> None:
         super().__init__()
         self.extractor = ALIKED(
-            max_num_keypoints=num_features, detection_threshold=0.01, resize=resize_to
+            max_num_keypoints=num_features,
+            detection_threshold=0.01,
+            resize=resize_to,
+            weights=weights,
         )
 
     def extract(

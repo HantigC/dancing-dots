@@ -6,6 +6,7 @@ from tqdm.auto import tqdm
 from mts.core.matching.base import BaseMatcher
 from mts.pipeline.repository.inmemeory import ImageRepository
 from mts.pipeline.step.base import BasePipelineStep, use_image_repository
+import gc
 
 LOGGER = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ class MatchingStep(BasePipelineStep):
                 image_repository.get_pairs(),
                 desc="Match the keypoints and descriptors",
             ):
+                gc.collect()
                 idx1, idx2 = pair_idx
 
                 kps1 = torch.from_numpy(
@@ -56,6 +58,11 @@ class MatchingStep(BasePipelineStep):
                     desc1,
                     desc2,
                 )
+                idxs = idxs.detach().cpu().numpy()
+                del kps1
+                del kps2
+                del desc1
+                del desc2
                 if len(idxs) == 0:
                     continue
 
@@ -64,6 +71,6 @@ class MatchingStep(BasePipelineStep):
                     image_repository.add_matches(
                         idx1,
                         idx2,
-                        idxs.detach().cpu().numpy().reshape(-1, 2),
+                        idxs.reshape(-1, 2),
                         name=self.matches_name,
                     )

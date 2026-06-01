@@ -13,6 +13,8 @@ def compute_cross_pairs(
     cutoff_th=0.6,  # should be strict
     distance_th: float = 1000,
     min_pairs=20,
+    max_pairs_per_image: int | None = None,
+    max_pairs: int | None = None,
 ) -> list[PairType]:
     image_embeddings = from_np(image_embeddings)
     image_embeddings = to_2d(image_embeddings)
@@ -29,6 +31,8 @@ def compute_cross_pairs(
         to_match = ar[mask_idx]
         if len(to_match) < min_pairs:
             to_match = np.argsort(dm[st_idx])[:min_pairs]
+        if max_pairs_per_image is not None and len(to_match) > max_pairs_per_image:
+            to_match = np.argsort(dm[st_idx])[:max_pairs_per_image + 1]
         for idx in to_match:
             if st_idx == idx:
                 continue
@@ -37,4 +41,6 @@ def compute_cross_pairs(
                 matching_dict[st, nd] = DistancedTriple(st, nd, dm[st_idx, idx])
 
     matching_list = sorted(list(matching_dict.values()))
+    if max_pairs is not None:
+        matching_list = matching_list[:max_pairs]
     return matching_list

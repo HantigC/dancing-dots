@@ -17,12 +17,16 @@ class CrossEmbeddingParerStep(BasePipelineStep):
         cutoff_th: float = 0.6,
         distance_th: float = 1000,
         min_pairs: int = 20,
+        max_pairs_per_image: int | None = None,
+        max_pairs: int | None = None,
     ) -> None:
         super().__init__()
         self.min_images = min_images
         self.cutoff_th = cutoff_th
         self.distance_th = distance_th
         self.min_pairs = min_pairs
+        self.max_pairs_per_image = max_pairs_per_image
+        self.max_pairs = max_pairs
 
     @use_image_repository
     def run(self, image_repository: ImageRepository) -> None:
@@ -48,6 +52,8 @@ class CrossEmbeddingParerStep(BasePipelineStep):
             self.cutoff_th,
             self.distance_th,
             self.min_pairs,
+            max_pairs_per_image=self.max_pairs_per_image,
+            max_pairs=self.max_pairs,
         )
         possible_pairs = extract_possible_pairs(pairs, image_ids)
         return possible_pairs

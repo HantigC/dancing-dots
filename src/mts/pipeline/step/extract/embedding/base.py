@@ -15,6 +15,10 @@ class GlobalDescriptorStep(BasePipelineStep):
         super().__init__()
         self.global_extractor = global_extractor
 
+    def to(self, device, **kwargs):
+        self.global_extractor.to(device=device, **kwargs)
+        return super().to(device=device, **kwargs)
+
     @torch.no_grad
     def _extract(
         self,

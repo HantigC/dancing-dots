@@ -1,0 +1,5 @@
+pipeline_steps:
+  pairing:
+    cutoff_th: 0.225
+    distance_th: 1.75
+    min_pairs: 1

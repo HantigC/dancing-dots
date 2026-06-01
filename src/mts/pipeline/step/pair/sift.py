@@ -99,6 +99,8 @@ class SiftDistanceParer(BasePipelineStep):
         cutoff_th: float = 0.25,
         distance_th: float = 2.0,
         min_pairs: int = 1,
+        max_pairs_per_image: int | None = None,
+        max_pairs: int | None = None,
         save_keypoints: bool = False,
         save_descriptors: bool = False,
         save_matches: bool = False,
@@ -109,6 +111,8 @@ class SiftDistanceParer(BasePipelineStep):
         self.cutoff_th = cutoff_th
         self.distance_th = distance_th
         self.min_pairs = min_pairs
+        self.max_pairs_per_image = max_pairs_per_image
+        self.max_pairs = max_pairs
         self.save_keypoints = save_keypoints
         self.save_descriptors = save_descriptors
         self.save_matches = save_matches
@@ -147,6 +151,8 @@ class SiftDistanceParer(BasePipelineStep):
             cutoff_th=self.cutoff_th,
             distance_th=self.distance_th,
             min_pairs=self.min_pairs,
+            max_pairs_per_image=self.max_pairs_per_image,
+            max_pairs=self.max_pairs,
         )
         LOGGER.info("DINOv2 cross-pairs: %d candidate pairs", len(pairs))
         return pairs
