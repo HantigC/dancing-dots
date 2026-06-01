@@ -1,26 +1,34 @@
 """
-Distributed pipeline runner — designed to be launched via torchrun:
+Queue-based distributed pipeline runner.
 
-    torchrun --nproc_per_node=2 -m app.imc2025.run.distributed \\
-        config/pipeline/imc2025/0005/base.yaml \\
+All datasets are pushed onto a shared work queue.  Each worker process pulls
+one dataset at a time; as soon as it finishes it picks up the next one.  This
+avoids idle workers caused by uneven dataset sizes.
+
+No torchrun needed — launch directly:
+
+    uv run run-distributed \\
+        config/pipeline/imc2025/0009/base.yaml \\
         [merge1.yaml ...] \\
+        [--workers-per-gpu 2] \\
+        [--num-gpus 4] \\
         [-o datasets_names=[ETs,stairs]]
 
-Each rank handles a round-robin slice of the dataset list and runs on its
-own CUDA device (local_rank 0 → cuda:0, local_rank 1 → cuda:1).  After all
-ranks finish, rank 0 gathers predictions, renumbers cluster indices, and
-writes the submission CSV + summary.
+Alternatively, use ``launch-distributed`` which auto-detects GPU count.
+
+``rank_devices`` config field (list of ints) overrides the per-worker GPU
+assignment, e.g. ``rank_devices: [0,0,1,1]`` for 4 workers sharing 2 GPUs.
 """
 
 import json
 import logging
+import multiprocessing as mp
 import os
 from functools import partial
 from pathlib import Path
 
 import click
 import torch
-import torch.distributed as dist
 from omegaconf import OmegaConf
 
 from app.constants import DEBUG
@@ -40,6 +48,8 @@ from mts.helpers.project.git_project import GitProject
 from mts.utils.git import NotAGitRepositoryError, get_git_commit
 
 LOGGER = logging.getLogger(__name__)
+
+_DONE = None  # sentinel that tells a worker to exit
 
 
 def _replace_cuda_devices(cfg, device: str):
@@ -81,43 +91,86 @@ def _renumber_clusters(merged_samples: DatasetSamples, dataset_order: list[str])
         offset += local_max + 1
 
 
-def _worker(cfg) -> None:
+def _worker(
+    rank: int,
+    device: str,
+    cfg,
+    iteration_dirpath: Path,
+    all_samples: DatasetSamples,
+    dataset_queue: "mp.Queue[str | None]",
+    result_queue: "mp.Queue[DatasetSamples]",
+) -> None:
+    """Worker process: pull datasets from the queue until the sentinel is received."""
     from hydra.utils import get_method
 
-    rank = dist.get_rank()
-    world_size = dist.get_world_size()
-    local_rank = int(os.environ.get("LOCAL_RANK", rank))
+    cfg = _replace_cuda_devices(cfg, device)
 
-    cfg = _replace_cuda_devices(cfg, f"cuda:{local_rank}")
+    create_repo = get_method(cfg.reconstruction_runner.create_repository_method)
+    create_pipe = get_method(cfg.reconstruction_runner.create_pipeline_method)
+    create_pipe_state = get_method(cfg.reconstruction_runner.create_pipeline_state_method)
 
-    # --- Rank 0 allocates the iteration directory ---
-    last_project_iteration = None
-    if rank == 0:
-        last_project_iteration = GitProject.from_next_iteration(
-            cfg.project_path,
-            create=False,
-            save=cfg.save_project_to_git,
-        )
-        last_project_iteration.__enter__()
-        shared = [str(last_project_iteration.iteration_dirpath)]
-    else:
-        shared = [None]
+    completed: DatasetSamples = {}
+    try:
+        while True:
+            dataset_name = dataset_queue.get()
+            if dataset_name is _DONE:
+                break
 
-    dist.broadcast_object_list(shared, src=0)
-    iteration_dirpath = Path(shared[0])
+            LOGGER.info("[worker %d / %s] starting: %s", rank, device, dataset_name)
+            try:
+                pipeline = IMC2025Pipeline(
+                    iteration_dirpath,
+                    {dataset_name: all_samples[dataset_name]},
+                    create_repo,
+                    partial(create_pipe, cfg),
+                    create_pipeline_state=create_pipe_state,
+                )
+                pipeline.run([dataset_name])
+                completed.update(pipeline.samples)
+                LOGGER.info("[worker %d / %s] done: %s", rank, device, dataset_name)
+            except Exception:
+                LOGGER.exception(
+                    "[worker %d / %s] dataset %s failed — skipping",
+                    rank,
+                    device,
+                    dataset_name,
+                )
+    finally:
+        result_queue.put(completed)
 
-    if rank == 0:
-        setup_file_logging(iteration_dirpath)
-        LOGGER.info(
-            "Distributed run (world_size=%d):\n%s", world_size, OmegaConf.to_yaml(cfg)
-        )
-        try:
-            cfg.git_commit = get_git_commit()
-        except NotAGitRepositoryError:
-            cfg.git_commit = None
-        OmegaConf.save(cfg, iteration_dirpath / "config.yaml")
 
-    # --- Load samples (identical on every rank; each takes its slice) ---
+def _build_rank_devices(cfg, num_gpus: int, workers_per_gpu: int) -> list[str]:
+    """Return one device string per worker."""
+    rank_devices_cfg = cfg.get("rank_devices")
+    if rank_devices_cfg is not None:
+        return [f"cuda:{g}" for g in rank_devices_cfg]
+    return [f"cuda:{g}" for g in range(num_gpus) for _ in range(workers_per_gpu)]
+
+
+def _run(cfg, rank_devices: list[str]) -> None:
+    num_workers = len(rank_devices)
+
+    last_project_iteration = GitProject.from_next_iteration(
+        cfg.project_path,
+        create=False,
+        save=cfg.save_project_to_git,
+    )
+    last_project_iteration.__enter__()
+    iteration_dirpath = last_project_iteration.iteration_dirpath
+
+    setup_file_logging(iteration_dirpath)
+    LOGGER.info(
+        "Queue-distributed run — %d worker(s), devices %s:\n%s",
+        num_workers,
+        rank_devices,
+        OmegaConf.to_yaml(cfg),
+    )
+    try:
+        cfg.git_commit = get_git_commit()
+    except NotAGitRepositoryError:
+        cfg.git_commit = None
+    OmegaConf.save(cfg, iteration_dirpath / "config.yaml")
+
     data_dirpath = Path(cfg.get("data_dirpath", "data"))
     cfg.data_dirpath = data_dirpath
     run_type = RunType(cfg.get("run_type", RunType.TRAIN))
@@ -135,63 +188,54 @@ def _worker(cfg) -> None:
     datasets_cfg = cfg.get("datasets_names")
     all_datasets = list(datasets_cfg) if datasets_cfg is not None else list(all_samples.keys())
 
-    # Round-robin assignment: rank 0 → [0, 2, 4, …], rank 1 → [1, 3, 5, …]
-    my_datasets = all_datasets[rank::world_size]
-    my_samples = {k: all_samples[k] for k in my_datasets if k in all_samples}
+    LOGGER.info("Queuing %d dataset(s): %s", len(all_datasets), all_datasets)
 
-    LOGGER.info("[rank %d / %d] datasets: %s", rank, world_size, my_datasets)
+    ctx = mp.get_context("spawn")
+    dataset_queue: mp.Queue = ctx.Queue()
+    result_queue: mp.Queue = ctx.Queue()
 
-    create_repo = get_method(cfg.reconstruction_runner.create_repository_method)
-    create_pipe = get_method(cfg.reconstruction_runner.create_pipeline_method)
-    create_pipe_state = get_method(cfg.reconstruction_runner.create_pipeline_state_method)
+    for ds in all_datasets:
+        dataset_queue.put(ds)
+    for _ in range(num_workers):
+        dataset_queue.put(_DONE)
 
-    imc2025_pipeline = IMC2025Pipeline(
-        iteration_dirpath,
-        my_samples,
-        create_repo,
-        partial(create_pipe, cfg),
-        create_pipeline_state=create_pipe_state,
-    )
-    cfg.origin = imc2025_pipeline.project_dirpath
+    processes = [
+        ctx.Process(
+            target=_worker,
+            args=(rank, device, cfg, iteration_dirpath, all_samples, dataset_queue, result_queue),
+            daemon=True,
+        )
+        for rank, device in enumerate(rank_devices)
+    ]
+    for p in processes:
+        p.start()
+    for p in processes:
+        p.join()
 
-    dist.barrier()
+    merged_samples: DatasetSamples = {}
+    for _ in range(num_workers):
+        merged_samples.update(result_queue.get_nowait())
 
-    if my_datasets:
-        imc2025_pipeline.run(my_datasets)
+    _renumber_clusters(merged_samples, all_datasets)
 
-    # --- Gather predictions from all ranks to rank 0 ---
-    dist.barrier()
-    all_samples_per_rank = [None] * world_size
-    dist.all_gather_object(all_samples_per_rank, imc2025_pipeline.samples)
+    submission_dest = Path(cfg.get("submission_dest_dirpath") or iteration_dirpath)
+    submission_filepath = submission_dest / "submission.csv"
+    append_samples_to_csv(merged_samples, df, submission_filepath)
 
-    if rank == 0:
-        merged_samples: DatasetSamples = {}
-        for rank_samples in all_samples_per_rank:
-            merged_samples.update(rank_samples)
+    if run_type == RunType.TRAIN:
+        summary_dict = metric.score(
+            gt_csv=data_dirpath / "train_labels.csv",
+            user_csv=submission_filepath,
+            thresholds_csv=data_dirpath / "train_thresholds.csv",
+            mask_csv=None,
+            inl_cf=0,
+            strict_cf=-1,
+            verbose=True,
+        )
+        with open(iteration_dirpath / "summary.json", "w") as f:
+            json.dump(summary_dict, f, indent=4)
 
-        _renumber_clusters(merged_samples, all_datasets)
-
-        submission_dest = Path(cfg.get("submission_dest_dirpath") or iteration_dirpath)
-        submission_filepath = submission_dest / "submission.csv"
-        append_samples_to_csv(merged_samples, df, submission_filepath)
-
-        if run_type == RunType.TRAIN:
-            summary_dict = metric.score(
-                gt_csv=data_dirpath / "train_labels.csv",
-                user_csv=submission_filepath,
-                thresholds_csv=data_dirpath / "train_thresholds.csv",
-                mask_csv=None,
-                inl_cf=0,
-                strict_cf=-1,
-                verbose=True,
-            )
-            with open(iteration_dirpath / "summary.json", "w") as f:
-                json.dump(summary_dict, f, indent=4)
-
-        last_project_iteration.__exit__(None, None, None)
-
-    dist.barrier()
-    dist.destroy_process_group()
+    last_project_iteration.__exit__(None, None, None)
 
 
 @click.command()
@@ -202,21 +246,28 @@ def _worker(cfg) -> None:
     "-o",
     multiple=True,
     metavar="KEY=VALUE",
-    help="Dot-notation overrides applied after merges, e.g. -o datasets_names=[ETs].",
+    help="Dot-notation overrides, e.g. -o datasets_names=[ETs].",
 )
 @click.option("--environment", "-e", default=DEBUG, show_default=True)
 @click.option(
-    "--backend",
-    default="nccl",
+    "--workers-per-gpu",
+    default=1,
     show_default=True,
-    help="torch.distributed backend (nccl for NVIDIA, gloo for CPU fallback).",
+    help="Worker processes per GPU (ignored when rank_devices is set in config).",
+)
+@click.option(
+    "--num-gpus",
+    default=None,
+    type=int,
+    help="GPUs to use (default: torch.cuda.device_count()).",
 )
 def main(
     config_file: str,
     merge: tuple,
     override: tuple,
     environment: str,
-    backend: str,
+    workers_per_gpu: int,
+    num_gpus: int | None,
 ) -> None:
     os.environ["HYDRA_FULL_ERROR"] = "1"
     setup_from_env(environment)
@@ -227,8 +278,12 @@ def main(
     if override:
         cfg = OmegaConf.merge(cfg, OmegaConf.from_dotlist(list(override)))
 
-    dist.init_process_group(backend=backend)
-    _worker(cfg)
+    if num_gpus is None:
+        num_gpus = torch.cuda.device_count() or 1
+
+    rank_devices = _build_rank_devices(cfg, num_gpus, workers_per_gpu)
+    click.echo(f"Workers: {len(rank_devices)}  devices: {rank_devices}")
+    _run(cfg, rank_devices)
 
 
 if __name__ == "__main__":
