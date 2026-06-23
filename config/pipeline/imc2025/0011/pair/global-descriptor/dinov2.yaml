@@ -1,0 +1,6 @@
+pipeline_steps:
+  paring:
+    step:
+      global_descriptor:
+        _target_: mts.core.embedder.dinov2.DinoV2GlobalDescriptors.from_pretrained
+        model_location: model-weights/fb-dinov2/snapshots/f9e44c814b77203eaa57a6bdbbd535f21ede1415

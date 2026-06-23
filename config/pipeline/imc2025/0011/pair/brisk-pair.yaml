@@ -1,0 +1,11 @@
+pipeline_steps:
+  paring:
+    step:
+      _target_: mts.pipeline.step.pair.cv.make_brisk_distance_parer
+      thresh: 20
+      octaves: 2
+      k: 30
+      distance_th: 1000
+      max_pairs_per_image: 15
+      max_pairs: 750
+      top_n: 450

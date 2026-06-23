@@ -3,16 +3,18 @@ import torch
 from torch import nn
 
 from mts.core.model.netvald import NetVLAD
+from mts.helpers.torch import nn as nnx
 
 from .base import BaseEmbedder
 
 
 class NetVladEmbedding(
-    nn.Module,
     BaseEmbedder[
-        np.ndarray | torch.Tensor,
+        torch.Tensor,
         torch.Tensor,
     ],
+    nnx.DeviceMixin,
+    nn.Module,
 ):
     def __init__(self, cfg=None, model_location: str | None = None) -> None:
         super().__init__()
@@ -31,7 +33,6 @@ class NetVladEmbedding(
         return global_descriptor
 
     def to(self, device, **kwargs):
-        self.device = device
         return super().to(device=device, **kwargs)
 
     def img_to_vlad(self, img):
@@ -45,5 +46,6 @@ class NetVladEmbedding(
         img = img / 255.0
         if img.ndim == 3:
             img.unsqueeze_(0)
+
         # img = img.permute(0, 3, 1, 2)
         return img

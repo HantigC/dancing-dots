@@ -17,9 +17,10 @@ def match_densely(
     nd_fpath: str,
     scene_graph: nx.Graph,
     extract_dense_matches: Callable[[str, str], np.ndarray],
+    matches_upper_threshold: int = 500,
 ) -> None:
     st_kpts, nd_kpts = extract_dense_matches(st_fpath, nd_fpath)
-    if len(st_kpts) >= 500:
+    if len(st_kpts) >= matches_upper_threshold:
         LOGGER.info("Match densely (%s, %s)", st_fpath, nd_fpath,)
         scene_graph.add_edge(
             st_fpath,
@@ -50,12 +51,14 @@ def grow_densely(
         if not scene_graph.has_node(nd_fpath):
             print(f"`{nd_fpath}` not in the graph")
             continue
-        match_densely(
-            st_fpath,
-            nd_fpath,
-            scene_graph,
-            extract_dense_matches,
-        )
+
+        if not scene_graph.has_edge(st_fpath, nd_fpath):
+            match_densely(
+                st_fpath,
+                nd_fpath,
+                scene_graph,
+                extract_dense_matches,
+            )
 
 
 def grow_merging(
@@ -75,7 +78,6 @@ def grow_merging(
             for kpts_path in list(
                 nx.all_simple_paths(scene_graph, st_fpath, nd_fpath, cutoff=2)
             ):
-                # TODO: Add a check if there are enough merges, if so, then merge, otherwise compute the matchings - which is more costly
                 # TODO: Check if it can be reconstructed from different paths
                 two_view: TwoViewEdge | None = merge_path(scene_graph, kpts_path)
                 if two_view is not None and two_view.num_matches > 500:

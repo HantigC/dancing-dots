@@ -1,0 +1,10 @@
+pipeline_steps:
+  paring:
+    step:
+      _target_: mts.pipeline.step.pair.cv.make_sift_distance_parer
+      num_features: 2048
+      k: 20
+      distance_th: 1000
+      max_pairs_per_image: 30
+      max_pairs: 1500
+      top_n: 500

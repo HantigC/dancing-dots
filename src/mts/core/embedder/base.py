@@ -34,10 +34,12 @@ def extract_embeddings(
 def extract_embeddings_from_images(
     embedder: BaseEmbedder,
     images: list[np.ndarray],
+    tqdm_kwargs: dict | None = None
 ) -> list[np.ndarray]:
     results = []
+    tqdm_kwargs = tqdm_kwargs or {}
     with torch.no_grad():
-        for image in tqdm(images):
+        for image in tqdm(images, **tqdm_kwargs):
             embedding = embedder.embed_image(image)
             results.append(embedding.cpu())
     return results

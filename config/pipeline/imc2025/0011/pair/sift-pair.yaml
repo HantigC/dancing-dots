@@ -1,0 +1,10 @@
+pipeline_steps:
+  paring:
+    step:
+      _target_: mts.pipeline.step.pair.sift.SiftDistanceParer
+      cutoff_th: 1.3
+      distance_th: 10
+      min_pairs: 1
+      max_pairs_per_image: 15
+      max_pairs: 750
+      top_n: 450

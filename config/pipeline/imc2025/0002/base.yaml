@@ -1,7 +1,7 @@
 name: IMC2025
 description: |
-  Use SiftDistanceParer (DINOv2 global + SIFT validation) for pair creation
-  Use SiftKeypointMatchStep for CPU-based SIFT extraction and matching
+  Use MegaLoc global descriptors + kNN for pair creation
+  Use MASt3R merged matcher for dense keypoint matching
   Use ColmapReconstructionStep for incremental 3D reconstruction
 
 project_path: iterations
@@ -20,29 +20,30 @@ pipeline_steps:
     _target_: mts.pipeline.step.base.OnDeviceRunner
     device: cuda:0
     step:
-      _target_: mts.pipeline.step.pair.sift.SiftDistanceParer
-      save_keypoints: True
-      save_descriptors: True
-      save_matches: True
-      global_descriptor:
-        _target_: mts.core.embedder.dinov2.DinoV2GlobalDescriptors.from_pretrained
-        model_location: model-weights/fb-dinov2/snapshots/f9e44c814b77203eaa57a6bdbbd535f21ede1415
+      _target_: mts.pipeline.step.pair.mast3r.Mast3rParer.from_checkpoints
+      model_checkpoint: "checkpoints/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
+      retrieval_checkpoint: "checkpoints/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric_retrieval_trainingfree.pth"
+      scene_graph: retrieval-20-40
 
   kp_matching:
-    _target_: mts.pipeline.step.match.sift.SiftKeypointMatchStep
-    num_features: 2048
-    ratio_threshold: 0.75
-    min_matches: 30
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.match.mast3r.merged.Mast3rMatchPipelineStep.from_checkpoint
+      grow_graph:
+        _target_: mts.core.scene_graph.transient.grow_densely
+        _partial_: true
+      mast3r_model_checkpoint: "checkpoints/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
 
   reconstruction:
     _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep
-    keypoints_name: sift
-    descriptors_name: sift
-    matches_name: sift
+    keypoints_name: mast3r
+    matches_name: mast3r
     mapper_options:
       _target_: mts.helpers.colmap.options.create_incremental_pipeline_options
       min_model_size: 3
       max_num_models: 25
+
 
 reconstruction_runner:
   create_pipeline_method: app.imc2025.pipeline.create_pipeline

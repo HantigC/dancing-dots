@@ -1,0 +1,6 @@
+pipeline_steps:
+  paring:
+    device: mps
+
+  kp_matching:
+    device: mps

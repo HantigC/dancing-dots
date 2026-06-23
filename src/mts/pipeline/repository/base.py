@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Generator, Iterable, Tuple
 
 import numpy as np
+from PIL import Image
 
 from mts.core.types import ImageId, PairType
 
@@ -138,6 +139,22 @@ class BaseImageRepository(ABC):
             The image as a NumPy array.
         """
         pass
+
+    def get_size_wh(self, image_id: ImageId) -> tuple[int, int]:
+        """Returns (width, height) for an image, reading from disk only once."""
+        cached = self.get_metadata(image_id)
+        if cached and "width" in cached and "height" in cached:
+            return cached["width"], cached["height"]
+        filepath = self.get_filepath(image_id)
+        with Image.open(filepath) as img:
+            w, h = img.size
+        self.upsert_metadata(image_id, width=w, height=h)
+        return w, h
+
+    def get_size_hw(self, image_id: ImageId) -> tuple[int, int]:
+        """Returns (height, width) for an image, reading from disk only once."""
+        w, h = self.get_size_wh(image_id)
+        return h, w
 
     @abstractmethod
     def add_metadata(self, image_id: ImageId, **kwargs) -> None:

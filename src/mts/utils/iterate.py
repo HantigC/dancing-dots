@@ -3,6 +3,7 @@ from typing import Callable, Hashable, Sequence, TypeVar
 
 T = TypeVar("T")
 K = TypeVar("K", bound=Hashable)
+R = TypeVar("R")
 
 
 def identity(item: K) -> K:
@@ -12,13 +13,17 @@ def identity(item: K) -> K:
 def group_by(
     items: Sequence[T],
     key: Callable[[T], K] | None = None,
+    value: Callable[[T], R] | None = None
 ) -> dict[K, list[T]]:
     if key is None:
         key = identity
 
+    if value is None:
+        value = identity
+
     grouped_dict: dict[K, list[T]] = {}
     for item in items:
-        grouped_dict.setdefault(key(item), []).append(item)
+        grouped_dict.setdefault(key(item), []).append(value(item))
     return grouped_dict
 
 

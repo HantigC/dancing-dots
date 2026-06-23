@@ -9,6 +9,7 @@ PairType = tuple[T, T]
 ImageId = int
 PathLike = str | Path
 StateType = dict[str, Any]
+Pairs = list[PairType[T]]
 
 
 class DistancedTriple(NamedTuple):

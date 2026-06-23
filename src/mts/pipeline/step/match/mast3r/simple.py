@@ -6,7 +6,7 @@ from typing import Any
 import torch
 from mast3r.model import AsymmetricMASt3R
 
-from mts.core.matcher.dense.mast3r import match_pairs
+from mts.core.matching.dense.mast3r import match_pairs
 from mts.core.model.mast3r.io import load_model
 from mts.pipeline.repository.inmemeory import ImageRepository
 from mts.pipeline.step.extract.kp.base import BasePipelineStep

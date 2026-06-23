@@ -1,3 +1,6 @@
+import os
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"]='1'
+
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,7 +22,7 @@ def load_gt_samples(
     train_labels_filename: str = "train_labels.csv",
 ) -> dict[str, dict[str, list[GTSample]]]:
     train_labels_filepath = Path(data_filepath) / train_labels_filename
-    samples = load_from_csv(data_filepath, train_labels_filename)
+    samples, _ = load_from_csv(data_filepath, train_labels_filename)
     train_samples = read_csv(train_labels_filepath)
     gt_samples_map = {}
     for dataset_name, dataset in samples.items():
