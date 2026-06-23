@@ -23,7 +23,7 @@ pipeline_steps:
       _target_: mts.pipeline.step.extract.embedding.base.GlobalDescriptorStep
       global_extractor:
         _target_: mts.core.embedder.megaloc.MegaLocDescriptors.from_pretrained
-        model_location: gmberton/MegaLoc
+        weights_path: model-weights/megaloc/snapshots/7cb9f7970d366fdf059963d04d372e503e8e9df9/model.safetensors
 
   pairing:
     _target_: mts.pipeline.step.pair.knn.KnnEmbeddingParerStep
