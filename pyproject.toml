@@ -18,7 +18,7 @@ dependencies = [
     "pandas==2.3.3",
     "pycolmap==3.13.0",
     "shapely==2.1.2",
-    "torch==2.5",
+    "torch==2.5.1",
     "tqdm>=4.67.1",
     "trimesh>=4.0.0",
     "manifold3d>=3.0.0",
@@ -31,6 +31,7 @@ dependencies = [
     "gim",
     "lightglue",
     "asmk",
+    "romatch",
 ]
 
 [project.optional-dependencies]
@@ -43,6 +44,7 @@ build = [
     "setuptools>=80.9.0",
 ]
 dev = [
+    "streamlit>=1.45.0",
     "py3nvml==0.2.7",
     "nbformat==5.10.4",
     "transformers==4.57.1",
@@ -69,6 +71,7 @@ asmk = [
 run-on-mps = "app.imc2025.run.on_mps:main"
 run = "app.imc2025.run.run:main"
 run-distributed = "app.imc2025.run.distributed:main"
+launch-distributed = "app.imc2025.run.launch:main"
 upload-dataset-to-kaggle = "scripts.kaggle.upload_dataset:main"
 upload-model-weights-to-kaggle = "scripts.kaggle.upload_model_weights:main"
 
