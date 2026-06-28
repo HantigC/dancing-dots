@@ -16,6 +16,10 @@ LOGGER = logging.getLogger(__name__)
 
 
 class BasePipelineStep(ABC, DeviceMixin, nn.Module):
+
+    def name(self) -> str:
+        return self.__class__.__name__
+
     @abstractmethod
     def run(
         self,
@@ -36,6 +40,9 @@ class OnDeviceRunner(BasePipelineStep):
         super().__init__()
         self._run_on_device = device
         self.step = step
+
+    def name(self) -> str:
+        return self.step.__class__.__name__
 
     def run(
         self,
@@ -128,7 +135,7 @@ def run_pipeline(
     state = state or {}
     step_timings = {}
     for step in steps:
-        step_name = step.__class__.__name__
+        step_name = step.name()
         LOGGER.info("Running step '%s'", step_name)
         t0 = time.perf_counter()
         input = step.run(
