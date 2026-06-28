@@ -48,7 +48,7 @@ dev = [
     "py3nvml==0.2.7",
     "nbformat==5.10.4",
     "transformers==4.57.1",
-    "hloc",
+    # "hloc",
     "cython>=3.2.4",
     "ipykernel>=7.1.0",
     "matplotlib>=3.10.7",
@@ -57,9 +57,9 @@ dev = [
 ]
 [tool.uv]
 package = true
-override-dependencies = [
-    "lightglue",
-]
+# override-dependencies = [
+#     "lightglue",
+# ]
 
 [tool.uv.extra-build-dependencies]
 asmk = [
@@ -70,6 +70,7 @@ asmk = [
 [project.scripts]
 run-on-mps = "app.imc2025.run.on_mps:main"
 run = "app.imc2025.run.run:main"
+run-matrix = "app.imc2025.run.matrix:main"
 run-distributed = "app.imc2025.run.distributed:main"
 launch-distributed = "app.imc2025.run.launch:main"
 upload-dataset-to-kaggle = "scripts.kaggle.upload_dataset:main"
