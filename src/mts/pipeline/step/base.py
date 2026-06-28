@@ -1,4 +1,5 @@
 import logging
+import time
 from abc import ABC, abstractmethod
 from functools import wraps
 from typing import Any, Callable, Hashable
@@ -125,13 +126,20 @@ def run_pipeline(
     state: StateType | None = None,
 ) -> Any:
     state = state or {}
+    step_timings = {}
     for step in steps:
-        LOGGER.info("Running step '%s'", step.__class__.__name__)
+        step_name = step.__class__.__name__
+        LOGGER.info("Running step '%s'", step_name)
+        t0 = time.perf_counter()
         input = step.run(
             image_repository=image_repository,
             input=input,
             state=state,
         )
+        elapsed = time.perf_counter() - t0
+        step_timings[step_name] = elapsed
+        LOGGER.info("Step '%s' finished in %.2fs", step_name, elapsed)
+    image_repository.upsert_repository_metadata(step_timings=step_timings)
     return input
 
 

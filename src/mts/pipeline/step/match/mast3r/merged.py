@@ -36,7 +36,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         mast3r_model: AsymmetricMASt3R,
         grow_graph: GrowCallable,
         verbose: bool = True,
-        match_conf_th: float = 0.3,
+        match_conf_th: float = 0.5,
         pixel_tol: int = 0,
     ) -> None:
         super().__init__()
