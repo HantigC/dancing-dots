@@ -1,6 +1,6 @@
 name: IMC2025
 description: |
-  Use DINOv2 global descriptors + kNN for pair creation
+  Use NetVLAD global descriptors + kNN for pair creation
   Use MASt3R merged matcher for dense keypoint matching
   Use ColmapReconstructionStep for incremental 3D reconstruction
 
@@ -24,8 +24,8 @@ pipeline_steps:
     step:
       _target_: mts.pipeline.step.extract.embedding.base.GlobalDescriptorStep
       global_extractor:
-        _target_: mts.core.embedder.dinov2.DinoV2GlobalDescriptors.from_pretrained
-        model_location: model-weights/fb-dinov2/snapshots/f9e44c814b77203eaa57a6bdbbd535f21ede1415
+        _target_: mts.core.embedder.vlad.NetVladEmbedding
+        model_location: model-weights/net-vlad
 
   pairing:
     _target_: mts.pipeline.step.pair.knn.KnnEmbeddingParerStep

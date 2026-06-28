@@ -5,8 +5,7 @@ pipeline_steps:
   embedder:
     step:
       global_extractor:
-        # Update path once fb-dinov2 is uploaded to Kaggle
-        model_location: /kaggle/input/models/hantig/fb-dinov2/pytorch/default/1/snapshots/f9e44c814b77203eaa57a6bdbbd535f21ede1415
+        model_location: /kaggle/input/models/hantig/net-vlad/pytorch/default/1
 
   kp_matching:
     step:
