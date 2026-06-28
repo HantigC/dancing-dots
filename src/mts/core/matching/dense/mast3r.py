@@ -39,11 +39,13 @@ class NdFeatures(TypedDict):
 def extract_dense_kpts(
     pred1: StFeatures,
     pred2: NdFeatures,
-    st_original_shape: tuple[int, int],
-    nd_original_shape: tuple[int, int],
+    st_original_hw_shape: tuple[int, int],
+    nd_original_hw_shape: tuple[int, int],
     match_conf_th: float,
     min_pairs: int,
     device,
+    pixel_tol: int = 0,
+    subsample: int = 8,
 ) -> tuple[np.ndarray, np.ndarray]:
 
     # at this stage, you have the raw dust3r predictions
@@ -63,8 +65,8 @@ def extract_dense_kpts(
         conf1,
         conf2,
         device=device,
-        subsample=8,
-        pixel_tol=5,
+        subsample=subsample,
+        pixel_tol=pixel_tol,
     )
     score = corres[2]
     mask = score >= match_conf_th
@@ -96,8 +98,8 @@ def extract_dense_kpts(
     if len(matches_im0) < min_pairs:
         return (np.array([]), np.array([]))
 
-    matches_im0_org = transform_keypoints_to_original(matches_im0, st_original_shape)
-    matches_im1_org = transform_keypoints_to_original(matches_im1, nd_original_shape)
+    matches_im0_org = transform_keypoints_to_original(matches_im0, st_original_hw_shape)
+    matches_im1_org = transform_keypoints_to_original(matches_im1, nd_original_hw_shape)
 
     return matches_im0_org, matches_im1_org
 
@@ -110,6 +112,7 @@ def extract_dense_keypoints(
     match_conf_th: float = 1.001,
     device: str | torch.device = None,
     tqdm_kwargs: dict[str, Any] = None,
+    pixel_tol: int = 0,
     batch_size: int = 1,
 ) -> tuple[
     dict[str, np.ndarray],
@@ -151,7 +154,7 @@ def extract_dense_keypoints(
         )
         try:
             corres = extract_correspondences_nonsym(
-                desc1, desc2, conf1, conf2, device=device, subsample=8, pixel_tol=5
+                desc1, desc2, conf1, conf2, device=device, subsample=8, pixel_tol=pixel_tol,
             )
         except Exception:
             LOGGER.exception(
@@ -159,6 +162,7 @@ def extract_dense_keypoints(
                 name1,
                 name2,
             )
+            continue
         score = corres[2]
         mask = score >= match_conf_th
         matches_im0 = corres[0][mask].cpu().numpy()

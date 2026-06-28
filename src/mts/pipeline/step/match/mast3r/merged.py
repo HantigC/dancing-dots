@@ -36,11 +36,16 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         mast3r_model: AsymmetricMASt3R,
         grow_graph: GrowCallable,
         verbose: bool = True,
+        match_conf_th: float = 0.3,
+        pixel_tol: int = 0,
     ) -> None:
         super().__init__()
         self.mast3r_model = mast3r_model
         self.verbose = verbose
         self.grow_graph = grow_graph
+
+        self.match_conf_th = match_conf_th
+        self.pixel_tol = pixel_tol
 
     def run(
         self,
@@ -115,10 +120,10 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         for (st_image_filepath, nd_image_filepath), matches in matches_map.items():
             st_image_id = image_repository.get_image_id(Path(st_image_filepath))
             nd_image_id = image_repository.get_image_id(Path(nd_image_filepath))
-            image_repository.add_matches(st_image_id, nd_image_id, matches, name="mast3r")
-            kind = match_kind_map.get(
-                (st_image_filepath, nd_image_filepath)
+            image_repository.add_matches(
+                st_image_id, nd_image_id, matches, name="mast3r"
             )
+            kind = match_kind_map.get((st_image_filepath, nd_image_filepath))
             if kind is not None:
                 image_repository.upsert_match_metadata(
                     st_image_id, nd_image_id, match_kind=kind.value
@@ -139,6 +144,8 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
                 [st_filepath, nd_filepath],
                 device=self.device,
                 tqdm_kwargs=dict(disable=True),
+                match_conf_th=self.match_conf_th,
+                pixel_tol=self.pixel_tol,
                 batch_size=1,
             )
         except Exception:
@@ -199,6 +206,8 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
             mst_paris_indices,
             filepaths_as_str,
             device=self.device,
+            match_conf_th=self.match_conf_th,
+            pixel_tol=self.pixel_tol,
             batch_size=1,
         )
 
@@ -255,14 +264,19 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
                         num_matches=num_inliers,
                     ),
                     weight=num_inliers,
+                    mst=True,
                 )
         return scene_graph, filepath_to_hw
 
     @classmethod
     def from_checkpoint(
-        cls, mast3r_model_checkpoint: PathLike, grow_graph: GrowCallable, **kwargs
+        cls,
+        mast3r_model_checkpoint: PathLike,
+        grow_graph: GrowCallable,
+        device=torch.device("cpu"),
+        **kwargs,
     ) -> Mast3rMatchPipelineStep:
-        mast3r_model = load_model(mast3r_model_checkpoint, torch.device("cpu"))
+        mast3r_model = load_model(mast3r_model_checkpoint, device=device)
         return cls(
             mast3r_model,
             grow_graph,

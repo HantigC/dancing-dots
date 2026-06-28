@@ -69,3 +69,6 @@ class KnnEmbeddingParerStep(BasePipelineStep):
         ]
         LOGGER.info("MST starting pairs: %d", len(mst_pairs))
         state["starting_pairs"] = mst_pairs
+
+        LOGGER.info("Add starting pairs to state...")
+        image_repository.store("starting_pairs", mst_pairs)
