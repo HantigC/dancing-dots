@@ -1,9 +1,7 @@
-import itertools as it
 import logging
 from pathlib import Path
 from typing import Any, Callable, TypedDict
 
-import more_itertools as mit
 import networkx as nx
 import numpy as np
 import torch
@@ -16,7 +14,6 @@ from mts.core.matching.dense.mast3r import (
     EncodedImageDict,
     EncodedImageFeaturesDict,
     Mast3rTwoStep,
-    extract_dense_keypoints,
     extract_dense_kpts,
 )
 from mts.core.matching.dense.merge.round import merge_matches
@@ -28,7 +25,6 @@ from mts.core.types import ImageId, Pairs, PairType, PathLike
 from mts.helpers.torch.tensor import to
 from mts.pipeline.repository.base import BaseImageRepository
 from mts.pipeline.step.base import BasePipelineStep
-from mts.utils.iterate import group_by
 
 LOGGER = logging.getLogger(__name__)
 GrowCallable = Callable[
@@ -104,12 +100,18 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         mast3r_two_step: Mast3rTwoStep,
         grow_graph: GrowCallable,
         verbose: bool = True,
-        image_size: int = 500,
+        image_size: int = 512,
+        min_pairs: int = 50,
+        match_conf_th: float = 0.5,
+        pixel_tol: int = 0,
     ) -> None:
         super().__init__()
         self.mast3r_two_step = mast3r_two_step
         self.verbose = verbose
         self.grow_graph = grow_graph
+        self.match_conf_th = match_conf_th
+        self.min_pairs = min_pairs
+        self.pixel_tol = pixel_tol
         self.image_size = image_size
 
     def run(
@@ -135,6 +137,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         self,
         image_repository: BaseImageRepository,
     ) -> tuple[EncodedImageMap, ImageShapesMap]:
+        LOGGER.info("Encode images...")
         image_ids = list(image_repository.image_ids())
         image_filepaths = [
             image_repository.get_filepath(
@@ -183,173 +186,156 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
                         "true_shape": true_shape,
                     }
                 )
-                feature_map[image_id] = st_encoded_image_features
+                feature_map[image_id] = to(
+                    st_encoded_image_features, device=torch.device("cpu")
+                )
                 shapes_map[image_id] = true_shape
+
         return feature_map, shapes_map
 
-    def _decode_image_pair(
+    def _decode_pair(
+        self,
+        st_encoded_image_features: EncodedImageDict,
+        nd_encoded_image_features: EncodedImageDict,
+        st_true_shape: torch.Tensor,
+        nd_true_shape: torch.Tensor,
+    ) -> DecodedImagePairDict:
+        decoded_feature_pairs = self.mast3r_two_step.decode_feature_pairs(
+            to(
+                EncodedImageFeaturesDict.from_add_shape(
+                    st_encoded_image_features, st_true_shape
+                ),
+                device=self.device,
+            ),
+            to(
+                EncodedImageFeaturesDict.from_add_shape(
+                    nd_encoded_image_features, nd_true_shape
+                ),
+                device=self.device,
+            ),
+        )
+
+        return decoded_feature_pairs
+
+    def _compute_pair_matched_kpts(
+        self,
+        st_encoded_image_features: EncodedImageDict,
+        nd_encoded_image_features: EncodedImageDict,
+        st_true_shape: torch.Tensor,
+        nd_true_shape: torch.Tensor,
+        st_original_size: tuple[int, int],
+        nd_original_size: tuple[int, int],
+        validate: bool = True,
+    ) -> tuple[np.ndarray, np.ndarray]:
+
+        decoded_feature_pairs = self._decode_pair(
+            st_encoded_image_features,
+            nd_encoded_image_features,
+            st_true_shape,
+            nd_true_shape,
+        )
+        decoded_feature_pairs["st_features"]["true_shape"] = decoded_feature_pairs[
+            "st_features"
+        ]["true_shape"].squeeze()
+        decoded_feature_pairs["nd_features"]["true_shape"] = decoded_feature_pairs[
+            "nd_features"
+        ]["true_shape"].squeeze()
+        try:
+            st_kpts, nd_kpts = extract_dense_kpts(
+                to(decoded_feature_pairs["st_features"], device=torch.device("cpu")),
+                to(decoded_feature_pairs["nd_features"], device=torch.device("cpu")),
+                st_original_size,
+                nd_original_size,
+                self.match_conf_th,
+                self.min_pairs,
+                self.device,
+                pixel_tol=self.pixel_tol,
+            )
+        except Exception:
+            LOGGER.exception("Trouble with extracting the dense keypoints")
+            st_kpts, nd_kpts = np.array([]), np.array([])
+
+        if len(st_kpts) == 0:
+            return st_kpts, nd_kpts
+
+        if validate:
+            try:
+                inlier_matches = validate_kps_matches(
+                    st_kpts,
+                    nd_kpts,
+                    st_original_size,
+                    nd_original_size,
+                )
+            except Exception:
+                LOGGER.exception("Not able to validate")
+                st_kpts = np.empty((0, 2), np.float32)
+                nd_kpts = np.empty((0, 2), np.float32)
+            else:
+                st_kpts = st_kpts[inlier_matches[:, 0]]
+                nd_kpts = nd_kpts[inlier_matches[:, 1]]
+
+        return st_kpts, nd_kpts
+
+    def _compute_matched_kpts(
         self,
         feature_map: EncodedImageMap,
         shapes_map: ImageShapesMap,
-        image_repository: BaseImageRepository,
-    ):
-
+        pairs: Pairs[int],
+        original_sizes_map: dict[ImageId, tuple[int, int]],
+        validate: bool = True,
+    ) -> dict[PairType[ImageId], DecodedImagePairDict]:
+        dense_kps = {}
         with torch.no_grad():
-            decoded_feature_pairs = self.mast3r_two_step.decode_feature_pairs(
-                EncodedImageFeaturesDict.from_add_shape(
-                    batched["st_features_batch"],
-                    batched["st_shapes_batch"],
-                ),
-                EncodedImageFeaturesDict.from_add_shape(
-                    batched["nd_features_batch"],
-                    batched["nd_shapes_batch"],
-                ),
-            )
-            decoded_feature_pairs_list.append(decoded_feature_pairs)
+            for st_image_id, nd_image_id in tqdm(pairs):
+                st_encoded_image_features = feature_map[st_image_id]
+                nd_encoded_image_features = feature_map[nd_image_id]
 
-            original_sizes = [
-                (
-                    image_repository.get_size_hw(pairs[idx][0]),
-                    image_repository.get_size_hw(pairs[idx][1]),
-                )
-                for idx in batch_idx
-            ]
-            st_features_list = to(
-                unbatch(decoded_feature_pairs["st_features"]),
-                device=torch.device("cpu"),
-            )
-            nd_features_list = to(
-                unbatch(decoded_feature_pairs["nd_features"]),
-                device=torch.device("cpu"),
-            )
-
-            for pair_idx, (
-                st_original_size,
-                nd_original_size,
-            ), st_features, nd_features in zip(
-                batch_idx, original_sizes, st_features_list, nd_features_list
-            ):
-                st_features["true_shape"] = st_features["true_shape"].numpy().tolist()
-                nd_features["true_shape"] = nd_features["true_shape"].numpy().tolist()
-                dense_kps[tuple(pairs[pair_idx])] = extract_dense_kpts(
-                    st_features,
-                    nd_features,
+                st_true_shape = shapes_map[st_image_id]
+                nd_true_shape = shapes_map[nd_image_id]
+                st_original_size = original_sizes_map[st_image_id]
+                nd_original_size = original_sizes_map[nd_image_id]
+                st_kpts, nd_kpts = self._compute_pair_matched_kpts(
+                    st_encoded_image_features,
+                    nd_encoded_image_features,
+                    st_true_shape,
+                    nd_true_shape,
                     st_original_size,
                     nd_original_size,
-                    1.01,
-                    50,
-                    self.mps_device,
+                    validate,
                 )
+                if len(st_kpts) == 0:
+                    continue
+                dense_kps[st_image_id, nd_image_id] = st_kpts, nd_kpts
+        return dense_kps
 
     def _decode_batched_pairs(
         self,
         feature_map: EncodedImageMap,
         shapes_map: ImageShapesMap,
-        image_repository: BaseImageRepository,
         pairs: Pairs[int],
-        batch_size: int = 1,
+        original_sizes_map: dict[ImageId, tuple[int, int]],
     ) -> dict[PairType[ImageId], DecodedImagePairDict]:
-        batch_pair_idxs = self._compute_batches_idxs_pairs(
-            feature_map, pairs, batch_size
-        )
-        decoded_feature_pairs_list = []
-        dense_kps = {}
+        decoded_repr = {}
 
         with torch.no_grad():
-            for batch_idx in tqdm(batch_pair_idxs):
-                batched = collect_features(
-                    batch_idx,
-                    pairs,
-                    feature_map,
-                    shapes_map,
-                )
-                decoded_feature_pairs = self.mast3r_two_step.decode_feature_pairs(
-                    EncodedImageFeaturesDict.from_add_shape(
-                        batched["st_features_batch"],
-                        batched["st_shapes_batch"],
-                    ),
-                    EncodedImageFeaturesDict.from_add_shape(
-                        batched["nd_features_batch"],
-                        batched["nd_shapes_batch"],
-                    ),
-                )
-                decoded_feature_pairs_list.append(decoded_feature_pairs)
+            for st_image_id, nd_image_id in tqdm(pairs):
+                st_encoded_image_features = feature_map[st_image_id]
+                nd_encoded_image_features = feature_map[nd_image_id]
 
-                original_sizes = [
-                    (
-                        image_repository.get_size_hw(pairs[idx][0]),
-                        image_repository.get_size_hw(pairs[idx][1]),
-                    )
-                    for idx in batch_idx
-                ]
-                st_features_list = to(
-                    unbatch(decoded_feature_pairs["st_features"]),
-                    device=torch.device("cpu"),
-                )
-                nd_features_list = to(
-                    unbatch(decoded_feature_pairs["nd_features"]),
-                    device=torch.device("cpu"),
-                )
-
-                for pair_idx, (
+                st_true_shape = shapes_map[st_image_id]
+                nd_true_shape = shapes_map[nd_image_id]
+                st_original_size = original_sizes_map[st_image_id]
+                nd_original_size = original_sizes_map[nd_image_id]
+                decoded_repr[st_image_id, nd_image_id] = self._decode_pair(
+                    st_encoded_image_features,
+                    nd_encoded_image_features,
+                    st_true_shape,
+                    nd_true_shape,
                     st_original_size,
                     nd_original_size,
-                ), st_features, nd_features in zip(
-                    batch_idx, original_sizes, st_features_list, nd_features_list
-                ):
-                    st_features["true_shape"] = (
-                        st_features["true_shape"].numpy().tolist()
-                    )
-                    nd_features["true_shape"] = (
-                        nd_features["true_shape"].numpy().tolist()
-                    )
-                    dense_kps[tuple(pairs[pair_idx])] = extract_dense_kpts(
-                        st_features,
-                        nd_features,
-                        st_original_size,
-                        nd_original_size,
-                        1.01,
-                        50,
-                        self.mps_device,
-                    )
-
-        return decoded_feature_pairs_list
-
-    def _compute_batches_idxs_pairs(
-        self,
-        shapes_map: dict[ImageId, torch.Tuple],
-        pairs: list[PairType[ImageId]],
-        batch_size: int = 1,
-    ) -> list[list[int]]:
-
-        size_pair_idxs = (
-            [
-                (
-                    (
-                        tuple([*shapes_map[st_image_id].numpy().squeeze().tolist()]),
-                        tuple([*shapes_map[nd_image_id].numpy().squeeze().tolist()]),
-                    ),
-                    pair_num,
                 )
-                for pair_num, (st_image_id, nd_image_id) in enumerate(pairs)
-            ],
-        )
-        sizes_group = group_by(
-            size_pair_idxs,
-            key=lambda x: x[0],
-            value=lambda x: x[1],
-        )
 
-        mixed_bached_gen = (
-            mit.chunked(
-                pairs_idxs,
-                batch_size,
-            )
-            for pairs_idxs in sizes_group.values()
-        )
-
-        batch_pair_idxs = list(it.chain.from_iterable(mixed_bached_gen))
-        return batch_pair_idxs
+        return decoded_repr
 
     def _compute_matches(
         self,
@@ -378,23 +364,29 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         image_repository: BaseImageRepository,
         mst_pairs: list[PairType[ImageId]],
     ) -> nx.Graph:
-        scene_graph = self._init_graph_from_mst(
+        scene_graph, filepath_to_hw = self._init_graph_from_mst(
+            features_map,
+            shapes_map,
             image_repository,
             mst_pairs,
         )
-        possible_pairs = [
-            (
-                str(image_repository.get_filepath(st_id)),
-                str(image_repository.get_filepath(nd_id)),
-            )
-            for st_id, nd_id in image_repository.get_pairs()
-        ]
+        possible_pairs = []
+        for st_id, nd_id in image_repository.get_pairs():
+            st_filepath = str(image_repository.get_filepath(st_id))
+            nd_filepath = str(image_repository.get_filepath(nd_id))
+            if not scene_graph.has_edge(st_filepath, nd_filepath):
+                possible_pairs.append((st_filepath, nd_filepath))
 
         self.grow_graph(
             scene_graph,
             possible_pairs,
-            lambda st, nd: self._match_two_images(
-                st, nd, features_map, shapes_map, image_repository
+            lambda st_filepath, nd_filepath: self._match_two_images(
+                st_filepath,
+                nd_filepath,
+                features_map,
+                shapes_map,
+                image_repository,
+                validate=True,
             ),
         )
         return scene_graph
@@ -429,66 +421,28 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         features_map: EncodedImageMap,
         shapes_map: ImageShapesMap,
         image_repository: BaseImageRepository,
+        validate: bool = True,
     ) -> tuple[np.ndarray, np.ndarray]:
         st_image_id = image_repository.get_image_id(st_filepath)
         nd_image_id = image_repository.get_image_id(nd_filepath)
+        st_original_size = image_repository.get_size_hw(st_image_id)
+        nd_original_size = image_repository.get_size_hw(st_image_id)
 
         st_true_shape = shapes_map[st_image_id]
         nd_true_shape = shapes_map[nd_image_id]
         st_encoded_image_features = features_map[st_image_id]
         nd_encoded_image_features = features_map[nd_image_id]
 
-        decoded_feature_pairs = self.mast3r_two_step.decode_feature_pairs(
-            EncodedImageFeaturesDict.from_add_shape(
-                st_encoded_image_features, st_true_shape
-            ),
-            EncodedImageFeaturesDict.from_add_shape(
-                nd_encoded_image_features, nd_true_shape
-            ),
+        st_kpts, nd_kpts = self._compute_pair_matched_kpts(
+            st_encoded_image_features,
+            nd_encoded_image_features,
+            st_true_shape,
+            nd_true_shape,
+            st_original_size,
+            nd_original_size,
+            validate,
         )
-
-        decoded_feature_pairs["st_features"]["true_shape"] = (
-            decoded_feature_pairs["st_features"]["true_shape"].numpy().tolist()
-        )
-        decoded_feature_pairs["nd_features"]["true_shape"] = (
-            decoded_feature_pairs["nd_features"]["true_shape"].numpy().tolist()
-        )
-        st_original_size = image_repository.get_size_hw(st_image_id)
-        nd_original_size = image_repository.get_size_hw(nd_image_id)
-
-        try:
-            st_kpts, nd_kpts = extract_dense_kpts(
-                decoded_feature_pairs["st_features"],
-                decoded_feature_pairs["nd_features"],
-                st_original_size,
-                nd_original_size,
-                1.01,
-                50,
-                self.device,
-            )
-        except Exception:
-            LOGGER.exception("Trouble with extracting the dense keypoints")
-            st_kpts, nd_kpts = np.array([]), np.array([])
-
-        try:
-            inlier_matches = validate_kps_matches(
-                st_kpts,
-                nd_kpts,
-                st_original_size,
-                nd_original_size,
-            )
-        except Exception:
-            LOGGER.exception(
-                "Could not validate matches for %s <-> %s",
-                st_filepath,
-                nd_filepath,
-            )
-            inlier_matches = np.empty((0, 2), dtype=np.int32)
-
-        if len(inlier_matches) == 0:
-            return np.array([]), np.array([])
-
-        return st_kpts[inlier_matches[:, 0]], nd_kpts[inlier_matches[:, 1]]
+        return st_kpts, nd_kpts
 
     def _init_graph_from_mst(
         self,
@@ -496,20 +450,21 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         shapes_map: ImageShapesMap,
         image_repository: BaseImageRepository,
         mst_pairs: list[PairType[ImageId]],
-        batch_size: int = 1,
     ) -> tuple[nx.Graph, dict[str, tuple[int, int]]]:
         image_id_to_num = {}
         filepaths_as_str = []
+        original_size_map = {}
         for num, image_id in enumerate(image_repository.image_ids()):
             image_id_to_num[image_id] = num
             filepaths_as_str.append(str(image_repository.get_filepath(image_id)))
+            original_size_map[image_id] = image_repository.get_size_hw(image_id)
 
-        matches_map = self._decode_batched_pairs(
+        matches_map = self._compute_matched_kpts(
             features_map,
             shapes_map,
-            image_repository,
             mst_pairs,
-            batch_size,
+            original_size_map,
+            validate=True,
         )
 
         scene_graph = nx.Graph().to_undirected()
@@ -531,27 +486,11 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
             st_kpts, nd_kpts = kpts
             st_filepath = image_repository.get_filepath(st_image_id)
             nd_filepath = image_repository.get_filepath(nd_image_id)
-            try:
-                inlier_matches = validate_kps_matches(
-                    st_kpts,
-                    nd_kpts,
-                    filepath_to_hw[st_filepath],
-                    filepath_to_hw[nd_filepath],
-                )
-            except Exception:
-                LOGGER.exception(
-                    "Could not validate matches for %s <-> %s",
-                    st_filepath,
-                    nd_filepath,
-                )
-                inlier_matches = np.empty((0, 2), dtype=np.int32)
+            st_kpts, nd_kpts = kpts
 
-            if len(inlier_matches) == 0:
+            if len(st_kpts) == 0:
                 continue
-
-            st_kpts = st_kpts[inlier_matches[:, 0]]
-            nd_kpts = nd_kpts[inlier_matches[:, 1]]
-            num_inliers = len(inlier_matches)
+            num_inliers = len(st_kpts)
             scene_graph.add_edge(
                 st_filepath,
                 nd_filepath,
@@ -571,9 +510,13 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
 
     @classmethod
     def from_checkpoint(
-        cls, mast3r_model_checkpoint: PathLike, grow_graph: GrowCallable, **kwargs
+        cls,
+        mast3r_model_checkpoint: PathLike,
+        grow_graph: GrowCallable,
+        device=torch.device("cpu"),
+        **kwargs,
     ) -> "Mast3rMatchPipelineStep":
-        mast3r_model = load_model(mast3r_model_checkpoint, torch.device("cpu"))
+        mast3r_model = load_model(mast3r_model_checkpoint, device=device)
         mast3r_two_step = Mast3rTwoStep(mast3r_model)
         return cls(
             mast3r_two_step,

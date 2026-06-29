@@ -76,8 +76,8 @@ def extract_dense_kpts(
     if len(matches_im0) < min_pairs:
         return (np.array([]), np.array([]))
 
-    H0, W0 = pred1["true_shape"]
-    H1, W1 = pred2["true_shape"]
+    H0, W0 = pred1["true_shape"].numpy()
+    H1, W1 = pred2["true_shape"].numpy()
 
     valid0 = (
         (matches_im0[:, 0] >= 3)
@@ -323,6 +323,8 @@ class Mast3rTwoStep(nn.Module):
         nd_features = self.mast3r_model._downstream_head(
             2, [tok.float() for tok in dec2], shape2
         )
+        st_features["true_shape"] = shape1
+        nd_features["true_shape"] = shape2
 
         nd_features["pts3d_in_other_view"] = nd_features.pop(
             "pts3d"
