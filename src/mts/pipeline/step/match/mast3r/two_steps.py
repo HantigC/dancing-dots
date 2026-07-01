@@ -133,6 +133,40 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
             image_repository,
         )
 
+    def _encode_image(self, image) -> EncodedImageDict:
+        ignore_keys = set(
+            [
+                "depthmap",
+                "dataset",
+                "label",
+                "instance",
+                "idx",
+                "true_shape",
+                "rng",
+            ]
+        )
+        for name in image.keys():  # pseudo_focal
+            if name in ignore_keys:
+                continue
+            image[name] = image[name].to(self.device, non_blocking=True)
+
+        img1 = image["img"]
+        b = img1.shape[0]
+        true_shape = image.get("true_shape")
+        if true_shape is not None:
+            if isinstance(true_shape, np.ndarray):
+                true_shape = torch.from_numpy(true_shape)
+        else:
+            true_shape = (torch.tensor(img1.shape[-2:])[None].repeat(b, 1),)
+
+        st_encoded_image_features = self.mast3r_two_step.encode_image(
+            {
+                "image": img1,
+                "true_shape": true_shape,
+            }
+        )
+        return st_encoded_image_features, true_shape
+
     def _encode_images(
         self,
         image_repository: BaseImageRepository,
@@ -153,41 +187,11 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
 
         feature_map = {}
         shapes_map = {}
-        ignore_keys = set(
-            [
-                "depthmap",
-                "dataset",
-                "label",
-                "instance",
-                "idx",
-                "true_shape",
-                "rng",
-            ]
-        )
         with torch.no_grad():
             for image_id, image in zip(image_ids, tqdm(images)):
-                for name in image.keys():  # pseudo_focal
-                    if name in ignore_keys:
-                        continue
-                    image[name] = image[name].to(self.device, non_blocking=True)
-
-                img1 = image["img"]
-                B = img1.shape[0]
-                true_shape = image.get("true_shape")
-                if true_shape is not None:
-                    if isinstance(true_shape, np.ndarray):
-                        true_shape = torch.from_numpy(true_shape)
-                else:
-                    true_shape = (torch.tensor(img1.shape[-2:])[None].repeat(B, 1),)
-
-                st_encoded_image_features = self.mast3r_two_step.encode_image(
-                    {
-                        "image": img1,
-                        "true_shape": true_shape,
-                    }
-                )
+                encoded_image_feature, true_shape = self._encode_image(image)
                 feature_map[image_id] = to(
-                    st_encoded_image_features, device=torch.device("cpu")
+                    encoded_image_feature, device=torch.device("cpu")
                 )
                 shapes_map[image_id] = true_shape
 
@@ -216,6 +220,35 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         )
 
         return decoded_feature_pairs
+
+    def _extract_dense_kpts(
+        self,
+        decoded_feature_pairs: DecodedImagePairDict,
+        st_original_size: tuple[int, int],
+        nd_original_size: tuple[int, int],
+    ) -> tuple[np.ndarray, np.ndarray]:
+        decoded_feature_pairs["st_features"]["true_shape"] = decoded_feature_pairs[
+            "st_features"
+        ]["true_shape"].squeeze()
+        decoded_feature_pairs["nd_features"]["true_shape"] = decoded_feature_pairs[
+            "nd_features"
+        ]["true_shape"].squeeze()
+        try:
+            st_kpts, nd_kpts = extract_dense_kpts(
+                to(decoded_feature_pairs["st_features"], device=torch.device("cpu")),
+                to(decoded_feature_pairs["nd_features"], device=torch.device("cpu")),
+                st_original_size,
+                nd_original_size,
+                self.match_conf_th,
+                self.min_pairs,
+                self.device,
+                pixel_tol=self.pixel_tol,
+            )
+        except Exception:
+            LOGGER.exception("Trouble with extracting the dense keypoints")
+            st_kpts, nd_kpts = np.array([]), np.array([])
+
+        return st_kpts, nd_kpts
 
     def _compute_pair_matched_kpts(
         self,
@@ -324,15 +357,11 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
 
                 st_true_shape = shapes_map[st_image_id]
                 nd_true_shape = shapes_map[nd_image_id]
-                st_original_size = original_sizes_map[st_image_id]
-                nd_original_size = original_sizes_map[nd_image_id]
                 decoded_repr[st_image_id, nd_image_id] = self._decode_pair(
                     st_encoded_image_features,
                     nd_encoded_image_features,
                     st_true_shape,
                     nd_true_shape,
-                    st_original_size,
-                    nd_original_size,
                 )
 
         return decoded_repr
