@@ -17,8 +17,12 @@ LOGGER = logging.getLogger(__name__)
 
 class BasePipelineStep(ABC, DeviceMixin, nn.Module):
 
+    def __init__(self, name=None, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._name = name or self.__class__.__name__
+
     def name(self) -> str:
-        return self.__class__.__name__
+        return self._name
 
     @abstractmethod
     def run(
@@ -42,7 +46,9 @@ class OnDeviceRunner(BasePipelineStep):
         self.step = step
 
     def name(self) -> str:
-        return self.step.__class__.__name__
+        if self._name is None:
+            return self.step.name()
+        return self._name
 
     def run(
         self,
@@ -157,6 +163,8 @@ def from_hydra_config_file(config_filepath: PathLike) -> list[BasePipelineStep]:
 
 def from_hydra_config(cfg) -> list[BasePipelineStep]:
     pipeline_steps = []
-    for step in cfg.pipeline_steps.values():
-        pipeline_steps.append(instantiate(step))
+    for name, step in cfg.pipeline_steps.items():
+        step_instance: BasePipelineStep = instantiate(step)
+        step_instance._name = name
+        pipeline_steps.append(step_instance)
     return pipeline_steps
