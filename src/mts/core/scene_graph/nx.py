@@ -1,6 +1,8 @@
 from collections import Counter
 
 import networkx as nx
+import networkx.algorithms.community as nx_comm
+from networkx import edge_betweenness_centrality as betweenness
 import numpy as np
 
 from mts.core.matching.utils.merging import match_kpts
@@ -149,6 +151,33 @@ def merge_path(
         match_kind=MatchKind.MERGED,
         num_matches=len(from_inlier_kpts),
     )
+
+
+def prune_connections(scene_graph: nx.Graph) -> nx.Graph:
+    def most_central_edge(G):
+        centrality = betweenness(G, weight="weight")
+        return max(centrality, key=centrality.get)
+
+    comp = nx_comm.girvan_newman(
+        scene_graph,
+        most_valuable_edge=most_central_edge,
+    )
+
+    # Get the first split (top level)
+    top_level = next(comp)
+    # Map each node to its community index
+    node_to_comm = {}
+    for i, community in enumerate(top_level):
+        for node in community:
+            node_to_comm[node] = i
+
+    # Copy the graph and remove edges that cross communities
+    pruned_graph = scene_graph.copy()
+    edges_to_remove = [
+        (u, v) for u, v in pruned_graph.edges() if node_to_comm[u] != node_to_comm[v]
+    ]
+    pruned_graph.remove_edges_from(edges_to_remove)
+    return pruned_graph
 
 
 def nums(scene_graph: nx.Graph) -> Counter:

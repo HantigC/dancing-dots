@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import pycolmap
 
@@ -17,9 +17,80 @@ from mts.pipeline.step.base import BasePipelineStep, use_image_repository
 LOGGER = logging.getLogger(__name__)
 
 
+def save_to_repository(
+    maps: dict[int, pycolmap.Reconstruction],
+    image_repository: BaseImageRepository,
+) -> None:
+    for map_index, cur_map in maps.items():
+        for index, image in cur_map.images.items():
+            rigid3d = image.cam_from_world()
+            image_id = image_repository.get_image_id(image.name)
+            image_repository.add_pose(
+                image_id,
+                Rigid3D(
+                    deepcopy(rigid3d.rotation.matrix()),
+                    deepcopy(rigid3d.translation),
+                ),
+            )
+            existing_metadata = image_repository.get_metadata(image_id) or {}
+            match_kind = existing_metadata.get("match_kind")
+            try:
+                image_repository.add_metadata(
+                    image_id, cluster=map_index, match_kind=match_kind
+                )
+            except AlreadyExistsException:
+                LOGGER.warning("`%d` already has 'cluster' metadata", image_id)
+                image_repository.update_metadata(
+                    image_id, cluster=map_index, match_kind=match_kind
+                )
+
+
+SaveToRepoCallable = Callable[
+    [
+        dict[int, pycolmap.Reconstruction],
+        BaseImageRepository,
+    ],
+    None,
+]
+
+
+def save_sorted_to_repository(
+    reconstructions_map: dict[int, pycolmap.Reconstruction],
+    image_repository: BaseImageRepository,
+) -> None:
+    sorted_reconstructions = sorted(
+        reconstructions_map.items(),
+        key=lambda x: x[1].num_reg_frames(),
+    )
+    sorted_reconstructions = dict(sorted_reconstructions)
+    for map_index, cur_map in sorted_reconstructions.items():
+        for index, image in cur_map.images.items():
+            rigid3d = image.cam_from_world()
+            image_id = image_repository.get_image_id(image.name)
+            image_repository.add_pose(
+                image_id,
+                Rigid3D(
+                    deepcopy(rigid3d.rotation.matrix()),
+                    deepcopy(rigid3d.translation),
+                ),
+            )
+            existing_metadata = image_repository.get_metadata(image_id) or {}
+            match_kind = existing_metadata.get("match_kind")
+            try:
+                image_repository.add_metadata(
+                    image_id, cluster=map_index, match_kind=match_kind
+                )
+            except AlreadyExistsException:
+                LOGGER.warning("`%d` already has 'cluster' metadata", image_id)
+                image_repository.update_metadata(
+                    image_id, cluster=map_index, match_kind=match_kind
+                )
+
+
 class BaseColmapReconstructionStep(BasePipelineStep, ABC):
     def __init__(
         self,
+        save_to_repository: SaveToRepoCallable | None = None,
         single_camera: bool = True,
         camera_model: str = CameraModel.PINHOLE,
         keypoints_name: str = "keypoints",
@@ -32,6 +103,9 @@ class BaseColmapReconstructionStep(BasePipelineStep, ABC):
         self.keypoints_name = keypoints_name
         self.descriptors_name = descriptors_name
         self.matches_name = matches_name
+        if save_to_repository is None:
+            save_to_repository = save_to_repository
+        self._save_to_repository = save_to_repository
 
     @use_image_repository(params=["state"])
     def run(
@@ -60,7 +134,7 @@ class BaseColmapReconstructionStep(BasePipelineStep, ABC):
             db=db,
             state=state,
         )
-        self._save_save_to_repository(maps, image_repository)
+        self._save_to_repository(maps, image_repository)
 
     @abstractmethod
     def _run_colmap(
@@ -71,27 +145,3 @@ class BaseColmapReconstructionStep(BasePipelineStep, ABC):
         state: StateType | None = None,
     ) -> dict[int, pycolmap.Reconstruction]:
         pass
-
-    def _save_save_to_repository(self, maps, image_repository: BaseImageRepository):
-        for map_index, cur_map in maps.items():
-            for index, image in cur_map.images.items():
-                rigid3d = image.cam_from_world()
-                image_id = image_repository.get_image_id(image.name)
-                image_repository.add_pose(
-                    image_id,
-                    Rigid3D(
-                        deepcopy(rigid3d.rotation.matrix()),
-                        deepcopy(rigid3d.translation),
-                    ),
-                )
-                existing_metadata = image_repository.get_metadata(image_id) or {}
-                match_kind = existing_metadata.get("match_kind")
-                try:
-                    image_repository.add_metadata(
-                        image_id, cluster=map_index, match_kind=match_kind
-                    )
-                except AlreadyExistsException:
-                    LOGGER.warning("`%d` already has 'cluster' metadata", image_id)
-                    image_repository.update_metadata(
-                        image_id, cluster=map_index, match_kind=match_kind
-                    )

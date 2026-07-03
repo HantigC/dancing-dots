@@ -36,6 +36,13 @@ GrowCallable = Callable[
     None,
 ]
 
+PruneCallable = Callable[
+    [
+        nx.Graph
+    ],
+    nx.Graph
+]
+
 
 class CollatedBatch(TypedDict):
     st_features_batch: EncodedImageFeaturesDict
@@ -99,6 +106,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         self,
         mast3r_two_step: Mast3rTwoStep,
         grow_graph: GrowCallable,
+        prune_connections: PruneCallable | None = None,
         verbose: bool = True,
         image_size: int = 512,
         min_pairs: int = 50,
@@ -115,6 +123,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         self.pixel_tol = pixel_tol
         self.image_size = image_size
         self.top_k_matches = top_k_matches
+        self.prune_connections = prune_connections
 
     def run(
         self,
@@ -386,6 +395,8 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
             image_repository,
             mst_pairs,
         )
+        if self.prune_connections is not None:
+            scene_graph = self.prune_connections(scene_graph)
         matches_dict, match_kind_map = extract_matches(scene_graph)
         global_keypoints, global_matches = merge_matches(matches_dict)
         return global_keypoints, global_matches, match_kind_map
