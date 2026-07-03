@@ -50,7 +50,7 @@ pipeline_steps:
       image_size: 512
       min_pairs: 50
       match_conf_th: 0.8
-      pixel_tol: 16
+      pixel_tol: 8
       top_k_matches: 1024
 
   reconstruction:
