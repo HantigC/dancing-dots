@@ -41,9 +41,11 @@ def extract_dense_kpts(
     pred2: NdFeatures,
     st_original_hw_shape: tuple[int, int],
     nd_original_hw_shape: tuple[int, int],
+
     match_conf_th: float,
     min_pairs: int,
     device,
+    top_k: int | None = None,
     pixel_tol: int = 0,
     subsample: int = 8,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -70,11 +72,21 @@ def extract_dense_kpts(
     )
     score = corres[2]
     mask = score >= match_conf_th
-    matches_im0 = corres[0][mask].cpu().numpy()
-    matches_im1 = corres[1][mask].cpu().numpy()
+
+    matches_im0 = corres[0][mask]
+    matches_im1 = corres[1][mask]
 
     if len(matches_im0) < min_pairs:
         return (np.array([]), np.array([]))
+
+    if top_k is not None:
+        maksed_score = score[mask]
+        indices = torch.argsort(maksed_score)
+        top_indices = indices[:top_k]
+        matches_im0 = matches_im0[top_indices]
+        matches_im1 = matches_im1[top_indices]
+    matches_im0 = matches_im0.cpu().numpy()
+    matches_im1 = matches_im1.cpu().numpy()
 
     H0, W0 = pred1["true_shape"].numpy()
     H1, W1 = pred2["true_shape"].numpy()

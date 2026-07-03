@@ -15,6 +15,8 @@ save_project_to_git: False
 submission_dest_dirpath: null
 tag: NetVlad+Mast3r+two-step
 mark: null
+zip_project: False
+zip_dest: None
 
 
 pipeline_steps:
@@ -49,6 +51,7 @@ pipeline_steps:
       min_pairs: 50
       match_conf_th: 0.8
       pixel_tol: 16
+      top_k_matches: 1024
 
   reconstruction:
     _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep

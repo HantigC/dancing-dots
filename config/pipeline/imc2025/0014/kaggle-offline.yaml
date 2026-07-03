@@ -1,3 +1,5 @@
+zip_project: True
+zip_dest: /kaggle/working/
 data_dirpath: "/kaggle/input/competitions/image-matching-challenge-2025-ongoing"
 submission_dest_dirpath: "/kaggle/working"
 
