@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import zipfile
 from pathlib import Path
 
 from mts.core.types import PathLike
@@ -26,10 +27,14 @@ class GitProject(BaseProject):
         create: bool = True,
         save: bool = True,
         skip_check: bool = True,
+        zip: bool = False,
+        zip_dest: str | None = None,
     ) -> None:
         self.remote = remote
         self.branch = branch
         self.save = save
+        self.zip = zip
+        self.zip_dest = zip_dest
         if not skip_check:
             self._check_in_sync()
         super().__init__(project_dir, iteration_name, create=create)
@@ -76,9 +81,21 @@ class GitProject(BaseProject):
             self._create()
         return self
 
+    def zip_iteration(self, dest: PathLike | None = None) -> Path:
+        zip_path = Path(dest) if dest is not None else self.project_dir / f"{self.iteration_name}.zip"
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for file in self.iteration_dirpath.rglob("*"):
+                if file.is_file():
+                    zf.write(file, file.relative_to(self.iteration_dirpath))
+        LOGGER.info("Zipped iteration to %s", zip_path)
+        return zip_path
+
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         if exc_type is not None:
             return
+
+        if self.zip:
+            self.zip_iteration(self.zip_dest)
 
         if not self.save:
             return

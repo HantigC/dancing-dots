@@ -30,6 +30,8 @@ def create_imc2025_from_cfg(cfg):
         cfg.project_path,
         create=False,
         save=cfg.save_project_to_git,
+        zip=cfg.get("zip_project", False),
+        zip_dest=cfg.get("zip_dest"),
     )
     create_pipeline = get_method(cfg.reconstruction_runner.create_pipeline_method)
     create_repository = get_method(cfg.reconstruction_runner.create_repository_method)

@@ -23,6 +23,7 @@ pipeline_steps:
     device: cuda:0
     step:
       _target_: mts.pipeline.step.extract.embedding.base.GlobalDescriptorStep
+      max_size: 1024
       global_extractor:
         _target_: mts.core.embedder.vlad.NetVladEmbedding
         model_location: model-weights/net-vlad

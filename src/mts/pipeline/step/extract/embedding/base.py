@@ -4,16 +4,18 @@ import tqdm
 from mts.core.embedder.base import BaseEmbedder
 from mts.pipeline.repository.inmemeory import ImageRepository
 from mts.pipeline.step.base import BasePipelineStep, use_image_repository
-from mts.utils.torchx import to_torch_format
+from mts.utils.torchx import resize_if_larger, to_torch_format
 
 
 class GlobalDescriptorStep(BasePipelineStep):
     def __init__(
         self,
         global_extractor: BaseEmbedder[torch.Tensor, torch.Tensor],
+        max_size: int | None = None,
     ) -> None:
         super().__init__()
         self.global_extractor = global_extractor
+        self.max_size = max_size
 
     def to(self, device, **kwargs):
         self.global_extractor.to(device=device, **kwargs)
@@ -34,8 +36,10 @@ class GlobalDescriptorStep(BasePipelineStep):
             ):
                 image = image_repository.load_image(image_index)
                 image = to_torch_format(image)
-                image = image.to(self.device)
+                if self.max_size is not None:
+                    image = resize_if_larger(image, self.max_size)
 
+                image = image.to(self.device)
                 global_descriptor = self.global_extractor.embed_image(image)
                 global_descriptor = global_descriptor.detach().cpu().numpy()
 
