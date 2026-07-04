@@ -1,0 +1,49 @@
+
+pipeline_steps:
+  embedder:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.extract.embedding.base.GlobalDescriptorStep
+      max_size: 1024
+      global_extractor:
+        _target_: mts.core.embedder.vlad.NetVladEmbedding
+        model_location: model-weights/net-vlad
+
+  pairing:
+    _target_: mts.pipeline.step.pair.knn.KnnEmbeddingParerStep
+    k: 30
+    min_distance_th: 0.0
+    distance_th: 10
+    max_pairs_per_image: 20
+    max_pairs: 1500
+
+  kp_matching:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.match.mast3r.two_steps.Mast3rMatchPipelineStep.from_checkpoint
+      grow_graph:
+        _target_: mts.core.scene_graph.transient.grow_densely
+        _partial_: true
+      mast3r_model_checkpoint: "model-weights/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
+      image_size: 512
+      min_pairs: 50
+      match_conf_th: 0.7
+      pixel_tol: 0
+      top_k_matches: 2048
+
+  reconstruction:
+    _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep
+    keypoints_name: mast3r
+    matches_name: mast3r
+    mapper_options:
+      _target_: mts.helpers.colmap.options.create_incremental_pipeline_options
+      min_model_size: 3
+      max_num_models: 25
+
+
+reconstruction_runner:
+  create_pipeline_method: app.imc2025.pipeline.create_pipeline
+  create_repository_method: app.imc2025.pipeline.create_h5_repository
+  create_pipeline_state_method: app.imc2025.pipeline.create_pipeline_state
