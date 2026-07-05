@@ -32,10 +32,10 @@ pipeline_steps:
 
   pairing:
     _target_: mts.pipeline.step.pair.knn.KnnEmbeddingParerStep
-    k: 20
+    k: 50
     min_distance_th: 0.0
     distance_th: 10
-    max_pairs_per_image: 15
+    max_pairs_per_image: 40
     max_pairs: 1000
 
   kp_matching:
