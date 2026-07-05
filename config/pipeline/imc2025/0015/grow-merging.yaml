@@ -1,0 +1,6 @@
+tag: MegaLoc+Mast3r+two-step+transitivity
+pipeline_steps:
+  kp_matching:
+    step:
+      grow_graph:
+        _target_: mts.core.scene_graph.transient.grow_merging
