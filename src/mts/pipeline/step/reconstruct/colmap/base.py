@@ -104,7 +104,7 @@ class BaseColmapReconstructionStep(BasePipelineStep, ABC):
         self.descriptors_name = descriptors_name
         self.matches_name = matches_name
         if save_to_repository is None:
-            save_to_repository = save_unsorted_to_repository
+            save_to_repository = save_sorted_to_repository
         self._save_to_repository = save_to_repository
 
     @use_image_repository(params=["state"])
