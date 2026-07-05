@@ -126,6 +126,8 @@ def extract_dense_keypoints(
     tqdm_kwargs: dict[str, Any] = None,
     pixel_tol: int = 0,
     batch_size: int = 1,
+    image_size: int = 512,
+    top_k: int | None = None,
 ) -> tuple[
     dict[str, np.ndarray],
     dict[tuple[str, str], np.ndarray],
@@ -142,7 +144,7 @@ def extract_dense_keypoints(
         key1, key2 = name1, name2
 
         # Only re-run inference for key1 if not in cache
-        images = load_images([name1, name2], size=512, verbose=False)
+        images = load_images([name1, name2], size=image_size, verbose=False)
         output = inference(
             [tuple(images)], mast3r_model, device, batch_size=batch_size, verbose=False
         )
@@ -177,11 +179,21 @@ def extract_dense_keypoints(
             continue
         score = corres[2]
         mask = score >= match_conf_th
-        matches_im0 = corres[0][mask].cpu().numpy()
-        matches_im1 = corres[1][mask].cpu().numpy()
+        matches_im0 = corres[0][mask]
+        matches_im1 = corres[1][mask]
 
         if len(matches_im0) < min_pairs:
             continue
+
+        if top_k is not None:
+            masked_score = score[mask]
+            indices = torch.argsort(masked_score)
+            top_indices = indices[:top_k]
+            matches_im0 = matches_im0[top_indices]
+            matches_im1 = matches_im1[top_indices]
+
+        matches_im0 = matches_im0.cpu().numpy()
+        matches_im1 = matches_im1.cpu().numpy()
 
         H0, W0 = view1["true_shape"][0].tolist()
         H1, W1 = view2["true_shape"][0].tolist()

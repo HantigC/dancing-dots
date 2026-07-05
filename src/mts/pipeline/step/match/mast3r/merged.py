@@ -29,23 +29,38 @@ GrowCallable = Callable[
     None,
 ]
 
+PruneCallable = Callable[
+    [
+        nx.Graph
+    ],
+    nx.Graph
+]
+
 
 class Mast3rMatchPipelineStep(BasePipelineStep):
     def __init__(
         self,
         mast3r_model: AsymmetricMASt3R,
         grow_graph: GrowCallable,
+        prune_connections: PruneCallable | None = None,
         verbose: bool = True,
+        image_size: int = 512,
+        min_pairs: int = 50,
         match_conf_th: float = 0.5,
         pixel_tol: int = 0,
+        top_k_matches: int | None = None,
     ) -> None:
         super().__init__()
         self.mast3r_model = mast3r_model
         self.verbose = verbose
         self.grow_graph = grow_graph
+        self.prune_connections = prune_connections
 
+        self.image_size = image_size
+        self.min_pairs = min_pairs
         self.match_conf_th = match_conf_th
         self.pixel_tol = pixel_tol
+        self.top_k_matches = top_k_matches
 
     def run(
         self,
@@ -76,6 +91,8 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         dict[tuple[str, str], MatchKind],
     ]:
         scene_graph = self._create_graph(image_repository, mst_pairs)
+        if self.prune_connections is not None:
+            scene_graph = self.prune_connections(scene_graph)
         matches_dict, match_kind_map = extract_matches(scene_graph)
         global_keypoints, global_matches = merge_matches(matches_dict)
         return global_keypoints, global_matches, match_kind_map
@@ -145,8 +162,11 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
                 device=self.device,
                 tqdm_kwargs=dict(disable=True),
                 match_conf_th=self.match_conf_th,
+                min_pairs=self.min_pairs,
                 pixel_tol=self.pixel_tol,
                 batch_size=1,
+                image_size=self.image_size,
+                top_k=self.top_k_matches,
             )
         except Exception:
             LOGGER.exception("Trouble with extracting the dense keypoints")
@@ -207,8 +227,11 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
             filepaths_as_str,
             device=self.device,
             match_conf_th=self.match_conf_th,
+            min_pairs=self.min_pairs,
             pixel_tol=self.pixel_tol,
             batch_size=1,
+            image_size=self.image_size,
+            top_k=self.top_k_matches,
         )
 
         scene_graph = nx.Graph().to_undirected()

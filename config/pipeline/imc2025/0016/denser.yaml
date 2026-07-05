@@ -1,0 +1,24 @@
+
+pipeline_steps:
+  pairing:
+    _target_: mts.pipeline.step.pair.knn.KnnEmbeddingParerStep
+    k: 40
+    min_distance_th: 0.0
+    distance_th: 10
+    max_pairs_per_image: 30
+    max_pairs: 2000
+
+  kp_matching:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.match.mast3r.two_steps.Mast3rMatchPipelineStep.from_checkpoint
+      grow_graph:
+        _target_: mts.core.scene_graph.transient.grow_densely
+        _partial_: true
+      mast3r_model_checkpoint: "model-weights/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
+      image_size: 512
+      min_pairs: 50
+      match_conf_th: 0.7
+      pixel_tol: 4
+      top_k_matches: 4096
