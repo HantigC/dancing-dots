@@ -1,0 +1,5 @@
+tag: DinoV2+Mast3r+two-step
+pipeline_steps:
+  kp_matching:
+    step:
+      _target_: mts.pipeline.step.match.mast3r.two_steps.Mast3rMatchPipelineStep.from_checkpoint
