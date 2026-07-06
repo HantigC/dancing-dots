@@ -1,0 +1,17 @@
+data_dirpath: "/kaggle/input/competitions/image-matching-challenge-2025-ongoing"
+submission_dest_dirpath: "/kaggle/working"
+
+pipeline_steps:
+  embedder:
+    step:
+      global_extractor:
+        model_location: /kaggle/input/models/hantig/net-vlad/pytorch/default/1
+
+  kp_extraction:
+    step:
+      extractor:
+        weights: /kaggle/input/models/hantig/kornia/pytorch/default/1/aliked-n16.pth
+
+  kp_matching:
+    step:
+      weights: /kaggle/input/models/hantig/kornia/pytorch/default/1/aliked_lightglue_v0-1_arxiv-pth
