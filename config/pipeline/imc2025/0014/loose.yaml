@@ -1,0 +1,8 @@
+
+pipeline_steps:
+  pairing:
+    k: 40
+    min_distance_th: 0.0
+    distance_th: 10
+    max_pairs_per_image: 30
+    max_pairs: 2000

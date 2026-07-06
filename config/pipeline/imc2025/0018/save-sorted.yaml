@@ -1,0 +1,8 @@
+
+pipeline_steps:
+  reconstruction:
+    _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep
+    save_to_repository:
+        _target_: mts.pipeline.step.reconstruct.colmap.base.save_sorted_to_repository
+        _partial_: true
+
