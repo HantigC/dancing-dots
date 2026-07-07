@@ -39,7 +39,7 @@ pipeline_steps:
       mast3r_model_checkpoint: "model-weights/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
       image_size: 512
       min_pairs: 50
-      match_conf_th: 0.8
+      match_conf_th: 0.9
       pixel_tol: 16
 
   reconstruction:

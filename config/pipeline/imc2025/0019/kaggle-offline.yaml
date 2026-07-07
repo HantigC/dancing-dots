@@ -10,6 +10,7 @@ pipeline_steps:
   kp_extraction:
     step:
       extractor:
+            
         weights: /kaggle/input/models/hantig/kornia/pytorch/default/1/aliked-n16.pth
 
   kp_matching:
