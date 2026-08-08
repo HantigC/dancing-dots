@@ -38,6 +38,22 @@ def to_2d(
     return tensor
 
 
+def to_numpy(
+    tensor_collection: TensorCollectionType,
+) -> NPArrayCollectionType:
+    if isinstance(tensor_collection, torch.Tensor):
+        return tensor_collection.detach().cpu().numpy()
+    elif isinstance(tensor_collection, dict):
+        return {
+            key: to_numpy(value) for key, value in tensor_collection.items()
+        }
+    elif isinstance(tensor_collection, list):
+        return [to_numpy(value) for value in tensor_collection]
+    elif isinstance(tensor_collection, tuple):
+        return tuple(to_numpy(value) for value in tensor_collection)
+    return tensor_collection
+
+
 def from_np(
     arrays: NPArrayCollectionType,
 ) -> TensorCollectionType:

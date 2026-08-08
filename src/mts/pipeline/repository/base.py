@@ -432,6 +432,60 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
+    def store_pair(
+        self,
+        img_id1: ImageId,
+        img_id2: ImageId,
+        name: str,
+        data: Any,
+        *,
+        directional: bool = False,
+    ) -> None:
+        """Stores arbitrary data associated with a pair of images.
+
+        Args:
+            img_id1: First image identifier.
+            img_id2: Second image identifier.
+            name: Namespace to store the data under, scoped per-pair (mirrors
+                `store`'s `name`, but per-pair rather than repository-global).
+            data: Data to store. Numpy arrays are stored natively, dicts are
+                stored recursively (nested dict values become nested groups,
+                ndarray leaves are stored natively), and all other leaves
+                must be JSON-serializable.
+            directional: If False (default), the pair is treated as
+                order-independent — `(img_id1, img_id2)` and `(img_id2,
+                img_id1)` resolve to the same entry, matching `add_matches`'
+                sorted-pair convention. If True, the pair is treated as
+                order-significant (e.g. asymmetric per-pair data where the
+                two images play different roles) — `(img_id1, img_id2)` and
+                `(img_id2, img_id1)` are distinct entries.
+        """
+        pass
+
+    @abstractmethod
+    def load_pair(
+        self,
+        img_id1: ImageId,
+        img_id2: ImageId,
+        *,
+        name: str = "data",
+        directional: bool = False,
+    ) -> Any:
+        """Retrieves data previously stored via `store_pair`.
+
+        Args:
+            img_id1: First image identifier.
+            img_id2: Second image identifier.
+            name: The namespace used in `store_pair`.
+            directional: Must match the value passed to `store_pair` for the
+                lookup to hit the same entry. See `store_pair` for details.
+
+        Returns:
+            The stored data, or None if not found.
+        """
+        pass
+
+    @abstractmethod
     def open(self) -> None:
         pass
 

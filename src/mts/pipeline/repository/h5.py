@@ -41,6 +41,12 @@ class H5ImageRepository(BaseImageRepository):
     def _pair_key(img_id1: int, img_id2: int) -> str:
         return f"{min(img_id1, img_id2)}_{max(img_id1, img_id2)}"
 
+    @classmethod
+    def _pair_store_key(cls, img_id1: int, img_id2: int, *, directional: bool) -> str:
+        if directional:
+            return f"{img_id1}_{img_id2}"
+        return cls._pair_key(img_id1, img_id2)
+
     def open(self):
         self._open()
 
@@ -91,6 +97,10 @@ class H5ImageRepository(BaseImageRepository):
     @property
     def _store_grp(self):
         return self._h5.require_group("store")
+
+    @property
+    def _pair_store_grp(self):
+        return self._h5.require_group("pair_store")
 
     def _get_file_for_reading(self):
         already_open = self._h5 is not None and self._h5.id.valid
@@ -427,12 +437,52 @@ class H5ImageRepository(BaseImageRepository):
                 st_image_id, nd_image_id = int(st_image_id), int(nd_image_id)
                 yield (st_image_id, nd_image_id), match[:]
 
+    @staticmethod
+    def _write_nested(grp: h5py.Group, data: dict[str, Any]) -> None:
+        """Recursively writes a nested dict into an h5py group.
+
+        dict values -> nested h5py subgroup (recurse); np.ndarray values ->
+        h5py dataset (native); everything else -> grp.attrs as JSON.
+        """
+        for key, value in data.items():
+            str_key = str(key)
+            if str_key in grp:
+                del grp[str_key]
+            if str_key in grp.attrs:
+                del grp.attrs[str_key]
+            if isinstance(value, dict):
+                sub_grp = grp.create_group(str_key)
+                H5ImageRepository._write_nested(sub_grp, value)
+            elif isinstance(value, np.ndarray):
+                grp.create_dataset(str_key, data=value)
+            else:
+                grp.attrs[str_key] = json.dumps(value)
+
+    @staticmethod
+    def _read_nested(grp: h5py.Group) -> dict[str, Any]:
+        """Inverse of `_write_nested`."""
+        result = {}
+        for key, value in grp.items():
+            result[key] = (
+                H5ImageRepository._read_nested(value)
+                if isinstance(value, h5py.Group)
+                else value[:]
+            )
+        for key, value in grp.attrs.items():
+            result[key] = json.loads(value)
+        return result
+
     def store(self, name: str, data: Any):
         with self:
             grp = self._store_grp
-            if isinstance(data, np.ndarray):
-                if name in grp:
-                    del grp[name]
+            if name in grp:
+                del grp[name]
+            if name in grp.attrs:
+                del grp.attrs[name]
+            if isinstance(data, dict):
+                sub_grp = grp.create_group(name)
+                self._write_nested(sub_grp, data)
+            elif isinstance(data, np.ndarray):
                 grp.create_dataset(name, data=data)
             else:
                 grp.attrs[name] = json.dumps(data)
@@ -441,9 +491,57 @@ class H5ImageRepository(BaseImageRepository):
         with self._reading() as h5_read:
             grp = h5_read.get("store", {})
             if name in grp:
-                return grp[name][:]
+                item = grp[name]
+                return self._read_nested(item) if isinstance(item, h5py.Group) else item[:]
             if name in grp.attrs:
                 return json.loads(grp.attrs[name])
+            return None
+
+    def store_pair(
+        self,
+        img_id1: int,
+        img_id2: int,
+        name: str,
+        data: Any,
+        *,
+        directional: bool = False,
+    ) -> None:
+        with self:
+            named_grp = self._pair_store_grp.require_group(name)
+            key = self._pair_store_key(img_id1, img_id2, directional=directional)
+            if key in named_grp:
+                del named_grp[key]
+            if key in named_grp.attrs:
+                del named_grp.attrs[key]
+            if isinstance(data, dict):
+                sub_grp = named_grp.create_group(key)
+                self._write_nested(sub_grp, data)
+            elif isinstance(data, np.ndarray):
+                named_grp.create_dataset(key, data=data)
+            else:
+                named_grp.attrs[key] = json.dumps(data)
+
+    def load_pair(
+        self,
+        img_id1: int,
+        img_id2: int,
+        *,
+        name: str = "data",
+        directional: bool = False,
+    ) -> Any:
+        with self._reading() as h5_read:
+            pair_store_grp = h5_read.get("pair_store")
+            if pair_store_grp is None:
+                return None
+            named_grp = pair_store_grp.get(name)
+            if named_grp is None:
+                return None
+            key = self._pair_store_key(img_id1, img_id2, directional=directional)
+            if key in named_grp:
+                item = named_grp[key]
+                return self._read_nested(item) if isinstance(item, h5py.Group) else item[:]
+            if key in named_grp.attrs:
+                return json.loads(named_grp.attrs[key])
             return None
 
     def add_pairs(self, pairs):

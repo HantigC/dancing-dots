@@ -33,6 +33,8 @@ class ImageRepository(BaseImageRepository):
         self._pairs = []
         self._poses: dict[ImageId, Rigid3D] = {}
         self._metadata: dict[ImageId, dict[str, Any]] = {}
+        self._store: dict[str, Any] = {}
+        self._pair_store: dict[str, dict[tuple, Any]] = {}
 
     def add_repository_metadata(self, **kwargs):
         for k, v in kwargs.items():
@@ -198,3 +200,46 @@ class ImageRepository(BaseImageRepository):
 
     def pair_num(self) -> int:
         return len(self._pairs)
+
+    def store(self, name: str, data: Any) -> None:
+        self._store[name] = data
+
+    def load(self, name: str) -> Any:
+        return self._store.get(name)
+
+    @staticmethod
+    def _pair_store_key(
+        img_id1: ImageId, img_id2: ImageId, *, directional: bool
+    ) -> tuple:
+        if directional:
+            return (img_id1, img_id2)
+        return tuple(sorted((img_id1, img_id2)))
+
+    def store_pair(
+        self,
+        img_id1: ImageId,
+        img_id2: ImageId,
+        name: str,
+        data: Any,
+        *,
+        directional: bool = False,
+    ) -> None:
+        key = self._pair_store_key(img_id1, img_id2, directional=directional)
+        self._pair_store.setdefault(name, {})[key] = data
+
+    def load_pair(
+        self,
+        img_id1: ImageId,
+        img_id2: ImageId,
+        *,
+        name: str = "data",
+        directional: bool = False,
+    ) -> Any:
+        key = self._pair_store_key(img_id1, img_id2, directional=directional)
+        return self._pair_store.get(name, {}).get(key)
+
+    def open(self) -> None:
+        pass
+
+    def close(self) -> None:
+        pass

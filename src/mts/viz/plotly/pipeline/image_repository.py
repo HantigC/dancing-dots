@@ -15,6 +15,7 @@ def plot_image_kpts_grid(
     image_repository: BaseImageRepository,
     image_ids: list[ImageId],
     cols: int = 5,
+    name: str = "keypoints",
 ) -> go.Figure:
     image_ids = list(image_ids)
     rows = math.ceil(len(image_ids) / cols)
@@ -28,7 +29,7 @@ def plot_image_kpts_grid(
         row = i // cols + 1
         col = i % cols + 1
         img = image_repository.load_image(image_id)
-        kpts = image_repository.get_keypoints(image_id)
+        kpts = image_repository.get_keypoints(image_id, name=name)
         fig.add_trace(go.Image(z=img), row=row, col=col)
         scatter_visible_off.append(True)
         if kpts is not None and len(kpts) > 0:

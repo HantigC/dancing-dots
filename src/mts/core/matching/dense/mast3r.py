@@ -41,7 +41,6 @@ def extract_dense_kpts(
     pred2: NdFeatures,
     st_original_hw_shape: tuple[int, int],
     nd_original_hw_shape: tuple[int, int],
-
     match_conf_th: float,
     min_pairs: int,
     device,
@@ -168,7 +167,13 @@ def extract_dense_keypoints(
         )
         try:
             corres = extract_correspondences_nonsym(
-                desc1, desc2, conf1, conf2, device=device, subsample=8, pixel_tol=pixel_tol,
+                desc1,
+                desc2,
+                conf1,
+                conf2,
+                device=device,
+                subsample=8,
+                pixel_tol=pixel_tol,
             )
         except Exception:
             LOGGER.exception(
@@ -313,6 +318,38 @@ class Mast3rTwoStep(nn.Module):
     def __init__(self, mast3r_model: AsymmetricMASt3R) -> None:
         super().__init__()
         self.mast3r_model = mast3r_model
+
+    def encode_image_pairs(
+        self,
+        st_image_dict: ImageDict,
+        nd_image_dict: ImageDict,
+        two_ways: bool = False,
+    ) -> DecodedImagePairDict:
+        st_encoded_image = self.encode_image(st_image_dict)
+        nd_encoded_image = self.encode_image(nd_image_dict)
+        decoded_feature_pairs = self.decode_feature_pairs(
+            EncodedImageFeaturesDict.from_add_shape(
+                st_encoded_image,
+                st_image_dict["true_shape"],
+            ),
+            EncodedImageFeaturesDict.from_add_shape(
+                nd_encoded_image,
+                nd_image_dict["true_shape"],
+            ),
+        )
+        if two_ways: 
+            nd_decoded_feature_pairs = self.decode_feature_pairs(
+                EncodedImageFeaturesDict.from_add_shape(
+                    nd_encoded_image,
+                    nd_image_dict["true_shape"],
+                ),
+                EncodedImageFeaturesDict.from_add_shape(
+                    st_encoded_image,
+                    st_image_dict["true_shape"],
+                ),
+            )
+            return decoded_feature_pairs, nd_decoded_feature_pairs
+        return decoded_feature_pairs
 
     def encode_image(self, image_dict: ImageDict) -> EncodedImageDict:
         image = image_dict["image"]
