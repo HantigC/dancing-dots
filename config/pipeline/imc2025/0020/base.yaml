@@ -1,0 +1,53 @@
+name: IMC2025
+description: |
+  Standalone step: encode every image once with MASt3R and decode every
+  image_repository pair, persisting both to the repository. No keypoint
+  extraction, matching, or reconstruction -- compute+persist only.
+
+project_path: iterations
+data_dirpath: "data/image-matching-challenge-2025"
+sample_filepath: null
+run_type: train
+origin: None
+git_commit: None
+datasets_names: null
+save_project_to_git: False
+submission_dest_dirpath: null
+tag: DinoV2+Mast3rEncodeDecode
+mark: null
+zip_project: False
+zip_dest: None
+
+
+pipeline_steps:
+  embedder:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.extract.embedding.base.GlobalDescriptorStep
+      max_size: 1024
+      global_extractor:
+        _target_: mts.core.embedder.dinov2.DinoV2GlobalDescriptors.from_pretrained
+        model_location: model-weights/fb-dinov2/snapshots/f9e44c814b77203eaa57a6bdbbd535f21ede1415
+
+  pairing:
+    _target_: mts.pipeline.step.pair.knn.KnnEmbeddingParerStep
+    k: 20
+    min_distance_th: 0.0
+    distance_th: 10
+    max_pairs_per_image: 15
+    max_pairs: 500
+
+  mast3r_encode_decode:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.match.mast3r.encode_decode.Mast3rEncodeDecodeStep.from_checkpoint
+      mast3r_model_checkpoint: "model-weights/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
+      image_size: 512
+
+
+reconstruction_runner:
+  create_pipeline_method: app.imc2025.pipeline.create_pipeline
+  create_repository_method: app.imc2025.pipeline.create_h5_repository
+  create_pipeline_state_method: app.imc2025.pipeline.create_pipeline_state

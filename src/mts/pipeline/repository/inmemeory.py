@@ -35,6 +35,7 @@ class ImageRepository(BaseImageRepository):
         self._metadata: dict[ImageId, dict[str, Any]] = {}
         self._store: dict[str, Any] = {}
         self._pair_store: dict[str, dict[tuple, Any]] = {}
+        self._pair_direction: dict[str, dict[tuple, tuple]] = {}
 
     def add_repository_metadata(self, **kwargs):
         for k, v in kwargs.items():
@@ -226,6 +227,7 @@ class ImageRepository(BaseImageRepository):
     ) -> None:
         key = self._pair_store_key(img_id1, img_id2, directional=directional)
         self._pair_store.setdefault(name, {})[key] = data
+        self._pair_direction.setdefault(name, {})[key] = (img_id1, img_id2)
 
     def load_pair(
         self,
@@ -234,9 +236,17 @@ class ImageRepository(BaseImageRepository):
         *,
         name: str = "data",
         directional: bool = False,
+        with_direction: bool = True,
     ) -> Any:
         key = self._pair_store_key(img_id1, img_id2, directional=directional)
-        return self._pair_store.get(name, {}).get(key)
+        data = self._pair_store.get(name, {}).get(key)
+        if not with_direction:
+            return data
+        direction = self._pair_direction.get(name, {}).get(key)
+        return data, direction
+
+    def get_stored_pairs(self, name: str) -> list[PairType[ImageId]]:
+        return list(self._pair_store.get(name, {}).keys())
 
     def open(self) -> None:
         pass

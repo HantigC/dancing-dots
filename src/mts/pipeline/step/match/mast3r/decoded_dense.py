@@ -8,19 +8,16 @@ import networkx as nx
 import numpy as np
 import torch
 
+from mts.core.matching.dense.mast3r import extract_dense_kpts
 from mts.core.matching.dense.merge.round import merge_matches
 from mts.core.matching.utils.validation import validate_kps_matches
-from mts.core.scene_graph.model import Image, MatchKind, TwoViewEdge
+from mts.core.scene_graph.model import Image, MatchKind
 from mts.core.scene_graph.nx import extract_matches
-from mts.core.types import ImageId, PairType
+from mts.core.types import ImageId
 from mts.helpers.torch.tensor import from_np
 from mts.helpers.torch.tensor import to as to_device
 from mts.pipeline.repository.base import BaseImageRepository
 from mts.pipeline.step.base import BasePipelineStep
-from mts.pipeline.step.match.mast3r.encode_decode import (
-    DescriptorsGrid,
-    extract_sparse_matches,
-)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -36,14 +33,15 @@ GrowCallable = Callable[
 PruneCallable = Callable[[nx.Graph], nx.Graph]
 
 
-class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
+class Mast3rDecodedDenseMatchPipelineStep(BasePipelineStep):
     """Builds a scene graph purely from MASt3R pair decodings that
     `Mast3rEncodeDecodeStep` already persisted to the image repository --
-    it never runs the MASt3R model itself. It only iterates over pairs that
-    have a persisted decoding (skipped by `Mast3rEncodeDecodeStep`'s
-    `min_matches` threshold are absent), loading the cached decoded
-    descriptor/confidence grids and extracting/validating sparse
-    correspondences for each.
+    it never runs the MASt3R model itself. It grows the graph over every
+    pair with a persisted decoding (pairs skipped by
+    `Mast3rEncodeDecodeStep`'s `min_matches` threshold are absent), loading
+    the cached decoded feature dicts and extracting/validating dense
+    correspondences (via `extract_dense_kpts`) for each, instead of the
+    grid-based sparse extraction `Mast3rDecodedMatchPipelineStep` uses.
     """
 
     def __init__(
@@ -51,16 +49,20 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
         grow_graph: GrowCallable,
         prune_connections: PruneCallable | None = None,
         decodings_name: str = "mast3r",
-        kernel_size: int = 7,
-        min_conf: float = 1.01,
+        match_conf_th: float = 0.5,
+        min_pairs: int = 50,
+        pixel_tol: int = 0,
+        top_k_matches: int | None = None,
         device: str | torch.device = "cpu",
     ) -> None:
         super().__init__()
         self.grow_graph = grow_graph
         self.prune_connections = prune_connections
         self.decodings_name = decodings_name
-        self.kernel_size = kernel_size
-        self.min_conf = min_conf
+        self.match_conf_th = match_conf_th
+        self.min_pairs = min_pairs
+        self.pixel_tol = pixel_tol
+        self.top_k_matches = top_k_matches
         self._device = torch.device(device)
 
     @property
@@ -79,10 +81,8 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
         input: Any = None,
         state: dict[str, Any] = None,
     ) -> Any:
-        starting_pairs: list[PairType[ImageId]] = state["starting_pairs"]
         keypoints_map, matches_map, match_kind_map = self._compute_matches(
             image_repository,
-            starting_pairs,
         )
         self._save_matches_and_kpts(
             keypoints_map,
@@ -94,13 +94,12 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
     def _compute_matches(
         self,
         image_repository: BaseImageRepository,
-        mst_pairs: list[PairType[ImageId]],
     ) -> tuple[
         dict[str, np.ndarray],
         dict[tuple[str, str], np.ndarray],
         dict[tuple[str, str], MatchKind],
     ]:
-        scene_graph = self._create_graph(image_repository, mst_pairs)
+        scene_graph = self._create_graph(image_repository)
         if self.prune_connections is not None:
             scene_graph = self.prune_connections(scene_graph)
         matches_dict, match_kind_map = extract_matches(scene_graph)
@@ -110,9 +109,16 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
     def _create_graph(
         self,
         image_repository: BaseImageRepository,
-        mst_pairs: list[PairType[ImageId]],
     ) -> nx.Graph:
-        scene_graph = self._init_graph_from_mst(image_repository, mst_pairs)
+        scene_graph = nx.Graph().to_undirected()
+        for image_id in image_repository.image_ids():
+            height, width = image_repository.get_size_hw(image_id)
+            filepath = str(image_repository.get_filepath(image_id))
+            scene_graph.add_node(
+                filepath,
+                image=Image(height=height, width=width),
+            )
+
         possible_pairs = [
             (
                 str(image_repository.get_filepath(st_id)),
@@ -177,21 +183,32 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
         else:
             st_features, nd_features = decoded["st_features"], decoded["nd_features"]
 
-        st_grid = DescriptorsGrid.from_tuple(st_features["conf"], st_features["desc"])
-        nd_grid = DescriptorsGrid.from_tuple(nd_features["conf"], nd_features["desc"])
+        st_features = dict(st_features)
+        nd_features = dict(nd_features)
+        st_features["true_shape"] = st_features["true_shape"].squeeze()
+        nd_features["true_shape"] = nd_features["true_shape"].squeeze()
 
         st_hw = image_repository.get_size_hw(st_id)
         nd_hw = image_repository.get_size_hw(nd_id)
 
-        st_kpts, nd_kpts = extract_sparse_matches(
-            st_grid,
-            nd_grid,
-            device=self._device,
-            kernel_size=self.kernel_size,
-            min_conf=self.min_conf,
-            st_original_size=st_hw,
-            nd_original_size=nd_hw,
-        )
+        try:
+            st_kpts, nd_kpts = extract_dense_kpts(
+                to_device(st_features, device=torch.device("cpu")),
+                to_device(nd_features, device=torch.device("cpu")),
+                st_hw,
+                nd_hw,
+                self.match_conf_th,
+                self.min_pairs,
+                self._device,
+                top_k=self.top_k_matches,
+                pixel_tol=self.pixel_tol,
+            )
+        except Exception:
+            LOGGER.exception(
+                "Could not extract dense keypoints for %s <-> %s", st_id, nd_id
+            )
+            return np.array([]), np.array([])
+
         if len(st_kpts) == 0:
             return np.array([]), np.array([])
 
@@ -207,43 +224,3 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
             return np.array([]), np.array([])
 
         return st_kpts[inlier_matches[:, 0]], nd_kpts[inlier_matches[:, 1]]
-
-    def _init_graph_from_mst(
-        self,
-        image_repository: BaseImageRepository,
-        mst_pairs: list[PairType[ImageId]],
-    ) -> nx.Graph:
-        scene_graph = nx.Graph().to_undirected()
-        for image_id in image_repository.image_ids():
-            height, width = image_repository.get_size_hw(image_id)
-            filepath = str(image_repository.get_filepath(image_id))
-            scene_graph.add_node(
-                filepath,
-                image=Image(height=height, width=width),
-            )
-
-        for st_id, nd_id in mst_pairs:
-            st_kpts, nd_kpts = self._decoded_pair_matches(image_repository, st_id, nd_id)
-            if len(st_kpts) == 0:
-                continue
-
-            st_filepath = str(image_repository.get_filepath(st_id))
-            nd_filepath = str(image_repository.get_filepath(nd_id))
-            num_inliers = len(st_kpts)
-            scene_graph.add_edge(
-                st_filepath,
-                nd_filepath,
-                two_view=TwoViewEdge(
-                    st_filepath=st_filepath,
-                    nd_filepath=nd_filepath,
-                    kpts_for={
-                        st_filepath: st_kpts,
-                        nd_filepath: nd_kpts,
-                    },
-                    match_kind=MatchKind.MATCHED,
-                    num_matches=num_inliers,
-                ),
-                weight=num_inliers,
-                mst=True,
-            )
-        return scene_graph

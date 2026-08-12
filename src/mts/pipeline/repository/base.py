@@ -470,6 +470,7 @@ class BaseImageRepository(ABC):
         *,
         name: str = "data",
         directional: bool = False,
+        with_direction: bool = True,
     ) -> Any:
         """Retrieves data previously stored via `store_pair`.
 
@@ -479,9 +480,32 @@ class BaseImageRepository(ABC):
             name: The namespace used in `store_pair`.
             directional: Must match the value passed to `store_pair` for the
                 lookup to hit the same entry. See `store_pair` for details.
+            with_direction: If True (default), returns `(data, direction)`,
+                where `direction` is the exact `(img_id1, img_id2)` order
+                that was passed to `store_pair` for this entry (or None if
+                no entry is found). Since non-directional storage resolves
+                `(a, b)` and `(b, a)` to the same entry, `direction` lets a
+                caller detect whether the order they queried with matches
+                the order the data was originally stored in — useful when
+                the stored data itself is order-sensitive (e.g. the two
+                images play different roles). If False, returns the bare
+                stored data, matching the pre-existing return shape.
 
         Returns:
-            The stored data, or None if not found.
+            `(data, direction)` by default, or bare `data` when
+            `with_direction=False`. `data` is None if not found.
+        """
+        pass
+
+    @abstractmethod
+    def get_stored_pairs(self, name: str) -> list[PairType[ImageId]]:
+        """Lists image ID pairs that have data stored via `store_pair`.
+
+        Args:
+            name: The namespace used in `store_pair`.
+
+        Returns:
+            A list of image ID pairs that have an entry under `name`.
         """
         pass
 

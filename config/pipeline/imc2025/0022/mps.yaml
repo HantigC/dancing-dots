@@ -1,0 +1,9 @@
+pipeline_steps:
+  embedder:
+    device: mps
+
+  mast3r_encode_decode:
+    device: mps
+
+  kp_matching:
+    device: mps

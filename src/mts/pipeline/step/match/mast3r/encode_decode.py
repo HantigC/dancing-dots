@@ -92,9 +92,12 @@ def match_descriptors(
     niter = 0
     max_iter = 1
     while notyet.any():
-        _, xy2[notyet] = to_numpy(
-            nd_tree.query(st_desc[xy1[notyet]], **matcher_kw),
-        )
+        try:
+            _, xy2[notyet] = to_numpy(
+                nd_tree.query(st_desc[xy1[notyet]], **matcher_kw),
+            )
+        except IndexError:
+            import pdb; pdb.set_trace()
         _, xy1[notyet] = to_numpy(
             st_tree.query(nd_desc[xy2[notyet]], **matcher_kw),
         )
@@ -199,11 +202,17 @@ def extract_sparse_matches(
         kernel_size=kernel_size,
         min_conf=min_conf,
     )
+
+    if len(st_rows) == 0 and len(st_cols) == 0:
+        return np.array([]), np.array([]),
     nd_rows, nd_cols = get_coords(
         nd_conf,
         kernel_size=kernel_size,
         min_conf=min_conf,
     )
+
+    if len(nd_rows) == 0 and len(nd_cols) == 0:
+        return np.array([]), np.array([])
 
     selected_st_desc = st_desc[st_rows, st_cols]
     selected_st_coords = st_coord_grid[st_rows, st_cols]
@@ -250,6 +259,7 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
         self,
         mast3r_two_step: Mast3rTwoStep,
         image_size: int = 512,
+        kernel_size: int = 7,
         encodings_name: str = "mast3r-encoding",
         decodings_name: str = "mast3r",
         min_matches: int = 50,
@@ -260,6 +270,7 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
         self.encodings_name = encodings_name
         self.decodings_name = decodings_name
         self.min_matches = min_matches
+        self.kernel_size = kernel_size
 
     @use_image_repository
     def run(self, image_repository: BaseImageRepository) -> None:
@@ -421,6 +432,7 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
             st_grid,
             nd_grid,
             device=self.device,
+            kernel_size=self.kernel_size,
             st_original_size=st_original_size,
             nd_original_size=nd_original_size,
         )

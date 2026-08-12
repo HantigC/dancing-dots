@@ -37,6 +37,8 @@ class H5ImageRepository(BaseImageRepository):
                 self._image_id_to_filepath[int(image_id)] = filepath
                 self._filepath_to_image_id[filepath] = int(image_id)
 
+    _DIRECTIONS_GROUP = "__directions__"
+
     @staticmethod
     def _pair_key(img_id1: int, img_id2: int) -> str:
         return f"{min(img_id1, img_id2)}_{max(img_id1, img_id2)}"
@@ -521,6 +523,9 @@ class H5ImageRepository(BaseImageRepository):
             else:
                 named_grp.attrs[key] = json.dumps(data)
 
+            directions_grp = named_grp.require_group(self._DIRECTIONS_GROUP)
+            directions_grp.attrs[key] = json.dumps([int(img_id1), int(img_id2)])
+
     def load_pair(
         self,
         img_id1: int,
@@ -528,21 +533,44 @@ class H5ImageRepository(BaseImageRepository):
         *,
         name: str = "data",
         directional: bool = False,
+        with_direction: bool = True,
     ) -> Any:
         with self._reading() as h5_read:
             pair_store_grp = h5_read.get("pair_store")
             if pair_store_grp is None:
-                return None
+                return (None, None) if with_direction else None
             named_grp = pair_store_grp.get(name)
             if named_grp is None:
-                return None
+                return (None, None) if with_direction else None
             key = self._pair_store_key(img_id1, img_id2, directional=directional)
+            data = None
             if key in named_grp:
                 item = named_grp[key]
-                return self._read_nested(item) if isinstance(item, h5py.Group) else item[:]
-            if key in named_grp.attrs:
-                return json.loads(named_grp.attrs[key])
-            return None
+                data = self._read_nested(item) if isinstance(item, h5py.Group) else item[:]
+            elif key in named_grp.attrs:
+                data = json.loads(named_grp.attrs[key])
+
+            if not with_direction:
+                return data
+
+            directions_grp = named_grp.get(self._DIRECTIONS_GROUP)
+            direction = None
+            if directions_grp is not None and key in directions_grp.attrs:
+                direction = tuple(json.loads(directions_grp.attrs[key]))
+            return data, direction
+
+    def get_stored_pairs(self, name: str) -> list[PairType[int]]:
+        with self._reading() as h5_read:
+            pair_store_grp = h5_read.get("pair_store")
+            if pair_store_grp is None:
+                return []
+            named_grp = pair_store_grp.get(name)
+            if named_grp is None:
+                return []
+            keys = (set(named_grp.keys()) | set(named_grp.attrs.keys())) - {
+                self._DIRECTIONS_GROUP
+            }
+            return [tuple(int(part) for part in key.split("_")) for key in keys]
 
     def add_pairs(self, pairs):
         with self:
