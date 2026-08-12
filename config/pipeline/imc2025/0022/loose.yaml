@@ -1,0 +1,9 @@
+
+tag: DinoV2(3000)+Mast3rEncodeDecode+DecodedDenseMatch
+pipeline_steps:
+  pairing:
+    k: 60
+    min_distance_th: 0.0
+    distance_th: 10
+    max_pairs_per_image: 40
+    max_pairs: 3000
