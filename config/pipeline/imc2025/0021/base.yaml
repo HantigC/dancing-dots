@@ -20,6 +20,7 @@ tag: DinoV2+Mast3rEncodeDecode+DecodedMatch
 mark: null
 zip_project: False
 zip_dest: None
+delete_repo: True
 
 
 pipeline_steps:

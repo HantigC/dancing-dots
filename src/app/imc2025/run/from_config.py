@@ -56,6 +56,7 @@ def create_imc2025_from_cfg(cfg):
         samples,
         create_repository,
         partial(create_pipeline, cfg),
+        delete_repo=cfg.delete_repo,
         create_pipeline_state=create_pipeline_state,
     )
     cfg.origin = imc2025_pipeline.project_dirpath

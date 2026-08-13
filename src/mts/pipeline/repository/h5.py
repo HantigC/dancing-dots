@@ -5,6 +5,7 @@ import logging
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Generator
+import os
 
 import h5py
 import numpy as np
@@ -19,11 +20,17 @@ LOGGER = logging.getLogger(__name__)
 
 
 class H5ImageRepository(BaseImageRepository):
-    def __init__(self, h5_path: PathLike, create_open: bool = False):
+    def __init__(
+        self,
+        h5_path: PathLike,
+        create_open: bool = False,
+        delete_on_exit: bool = False,
+    ):
         self._h5_path = Path(h5_path)
         self._h5 = None
         self._image_id_to_filepath = {}
         self._filepath_to_image_id = {}
+        self.delete_on_exit = delete_on_exit
         self._init_maps()
         if create_open:
             self.open()
@@ -130,6 +137,9 @@ class H5ImageRepository(BaseImageRepository):
             self._h5.flush()
         else:
             self._h5.close()
+
+    def delete_repo(self):
+        self._h5_path.unlink()
 
     def get_repository_metadata(self, name: str):
         with self._reading() as h5_read:
@@ -303,9 +313,13 @@ class H5ImageRepository(BaseImageRepository):
             pose_grp = poses_grp[str(image_id)]
             return Rigid3D(pose_grp.attrs["rotation"], pose_grp.attrs["translation"])
 
-    def add_keypoints(self, img_id: int, keypoints: np.ndarray, *, name: str = "keypoints"):
+    def add_keypoints(
+        self, img_id: int, keypoints: np.ndarray, *, name: str = "keypoints"
+    ):
         with self:
-            grp = self._features_grp.require_group(str(img_id)).require_group("keypoints")
+            grp = self._features_grp.require_group(str(img_id)).require_group(
+                "keypoints"
+            )
             if name in grp:
                 del grp[name]
             grp.create_dataset(name, data=keypoints)
@@ -322,9 +336,13 @@ class H5ImageRepository(BaseImageRepository):
                 return None
             return kp_grp[name][:]
 
-    def add_descriptors(self, img_id: int, descriptors: np.ndarray, *, name: str = "descriptors"):
+    def add_descriptors(
+        self, img_id: int, descriptors: np.ndarray, *, name: str = "descriptors"
+    ):
         with self:
-            grp = self._features_grp.require_group(str(img_id)).require_group("descriptors")
+            grp = self._features_grp.require_group(str(img_id)).require_group(
+                "descriptors"
+            )
             if name in grp:
                 del grp[name]
             grp.create_dataset(name, data=descriptors)
@@ -394,7 +412,9 @@ class H5ImageRepository(BaseImageRepository):
                 return {}
             return {k: json.loads(v) for k, v in grp.attrs.items()}
 
-    def add_matches(self, img_id1: int, img_id2: int, matches: np.ndarray, *, name: str = "matches"):
+    def add_matches(
+        self, img_id1: int, img_id2: int, matches: np.ndarray, *, name: str = "matches"
+    ):
         with self:
             key = self._pair_key(img_id1, img_id2)
             named_grp = self._matches_grp.require_group(name)
@@ -494,7 +514,9 @@ class H5ImageRepository(BaseImageRepository):
             grp = h5_read.get("store", {})
             if name in grp:
                 item = grp[name]
-                return self._read_nested(item) if isinstance(item, h5py.Group) else item[:]
+                return (
+                    self._read_nested(item) if isinstance(item, h5py.Group) else item[:]
+                )
             if name in grp.attrs:
                 return json.loads(grp.attrs[name])
             return None
@@ -546,7 +568,9 @@ class H5ImageRepository(BaseImageRepository):
             data = None
             if key in named_grp:
                 item = named_grp[key]
-                data = self._read_nested(item) if isinstance(item, h5py.Group) else item[:]
+                data = (
+                    self._read_nested(item) if isinstance(item, h5py.Group) else item[:]
+                )
             elif key in named_grp.attrs:
                 data = json.loads(named_grp.attrs[key])
 
@@ -607,6 +631,11 @@ class H5ImageRepository(BaseImageRepository):
         return H5ImageRepository(dest)
 
     @classmethod
-    def from_filename(cls, dirpath: PathLike, filename: str) -> H5ImageRepository:
+    def from_filename(
+        cls,
+        dirpath: PathLike,
+        filename: str,
+        delete_on_exit: bool = False,
+    ) -> H5ImageRepository:
         dirpath = Path(dirpath)
-        return cls(str(dirpath / filename))
+        return cls(str(dirpath / filename), delete_on_exit=delete_on_exit)

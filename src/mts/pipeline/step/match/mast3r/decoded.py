@@ -195,6 +195,8 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
         if len(st_kpts) == 0:
             return np.array([]), np.array([])
 
+        st_kpts = st_kpts[..., ::-1]
+        nd_kpts = nd_kpts[..., ::-1]
         try:
             inlier_matches = validate_kps_matches(st_kpts, nd_kpts, st_hw, nd_hw)
         except Exception:

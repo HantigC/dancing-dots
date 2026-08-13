@@ -112,6 +112,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         min_pairs: int = 50,
         match_conf_th: float = 0.5,
         pixel_tol: int = 0,
+        subsample: int = 8,
         top_k_matches: int | None = None
     ) -> None:
         super().__init__()
@@ -123,6 +124,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         self.pixel_tol = pixel_tol
         self.image_size = image_size
         self.top_k_matches = top_k_matches
+        self.subsample = subsample
         self.prune_connections = prune_connections
 
     def run(
@@ -253,6 +255,7 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
                 self.match_conf_th,
                 self.min_pairs,
                 self.device,
+                subsample=self.subsample,
                 top_k=self.top_k_matches,
                 pixel_tol=self.pixel_tol,
             )

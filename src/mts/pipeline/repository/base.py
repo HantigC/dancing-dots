@@ -202,6 +202,11 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
+    def delete_repo(self) -> None:
+        """Delete the whole repo"""
+        pass
+
+    @abstractmethod
     def get_metadata(self, image_id: ImageId) -> dict[str, Any] | None:
         """Retrieves all metadata for a specific image.
 

@@ -92,12 +92,9 @@ def match_descriptors(
     niter = 0
     max_iter = 1
     while notyet.any():
-        try:
-            _, xy2[notyet] = to_numpy(
-                nd_tree.query(st_desc[xy1[notyet]], **matcher_kw),
-            )
-        except IndexError:
-            import pdb; pdb.set_trace()
+        _, xy2[notyet] = to_numpy(
+            nd_tree.query(st_desc[xy1[notyet]], **matcher_kw),
+        )
         _, xy1[notyet] = to_numpy(
             st_tree.query(nd_desc[xy2[notyet]], **matcher_kw),
         )
@@ -440,6 +437,9 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
             return 0
 
         try:
+
+            st_kpts = st_kpts[..., ::-1]
+            nd_kpts = nd_kpts[..., ::-1]
             inlier_matches = validate_kps_matches(
                 st_kpts,
                 nd_kpts,

@@ -41,7 +41,7 @@ pipeline_steps:
     min_distance_th: 0.0
     distance_th: 10
     max_pairs_per_image: 15
-    max_pairs: 500
+    max_pairs: 150
 
   mast3r_encode_decode:
     _target_: mts.pipeline.step.base.OnDeviceRunner

@@ -36,7 +36,7 @@ pipeline_steps:
     min_distance_th: 0.0
     distance_th: 10
     max_pairs_per_image: 40
-    max_pairs: 1000
+    max_pairs: 500
 
   kp_matching:
     _target_: mts.pipeline.step.base.OnDeviceRunner
@@ -50,6 +50,7 @@ pipeline_steps:
       image_size: 512
       min_pairs: 50
       match_conf_th: 0.8
+      subsample: 16
       pixel_tol: 16
 
   reconstruction:

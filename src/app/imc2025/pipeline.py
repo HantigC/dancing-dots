@@ -35,6 +35,7 @@ class IMC2025Pipeline:
     create_pipeline_state: (
         Callable[[IMC2025Pipeline, BaseImageRepository, str], StateType] | None
     ) = field(default=None)
+    delete_repo: bool = field(default=False)
     _last_cluster_index: int = field(default=0)
     _repositories_map: dict[str, BaseImageRepository] = field(default_factory=dict)
 
@@ -54,21 +55,45 @@ class IMC2025Pipeline:
         datasets_names = self._get_dataset_names(datasets_names)
         t0 = time.monotonic()
         for num, dataset_name in enumerate(datasets_names, 1):
-            LOGGER.info("=" * 80, )
-            LOGGER.info("*" * 80, )
-            LOGGER.info("Started running for '%s' dataset: [%d/%d]", dataset_name, num, len(datasets_names))
-            LOGGER.info("=" * 80, )
+            LOGGER.info(
+                "=" * 80,
+            )
+            LOGGER.info(
+                "*" * 80,
+            )
+            LOGGER.info(
+                "Started running for '%s' dataset: [%d/%d]",
+                dataset_name,
+                num,
+                len(datasets_names),
+            )
+            LOGGER.info(
+                "=" * 80,
+            )
             try:
                 self.run_for(dataset_name)
             except Exception:
-                LOGGER.exception("Something happened for dataset '%s', skipping", dataset_name)
+                LOGGER.exception(
+                    "Something happened for dataset '%s', skipping", dataset_name
+                )
 
-            LOGGER.info("*" * 80, )
-            LOGGER.info("Ended running for '%s' dataset: [%d/%d]", dataset_name, num, len(datasets_names))
-            LOGGER.info("=" * 80, )
+            LOGGER.info(
+                "*" * 80,
+            )
+            LOGGER.info(
+                "Ended running for '%s' dataset: [%d/%d]",
+                dataset_name,
+                num,
+                len(datasets_names),
+            )
+            LOGGER.info(
+                "=" * 80,
+            )
 
         elapsed = time.monotonic() - t0
-        LOGGER.info("Pipeline finished in %.2f seconds (%.2f minutes)", elapsed, elapsed / 60)
+        LOGGER.info(
+            "Pipeline finished in %.2f seconds (%.2f minutes)", elapsed, elapsed / 60
+        )
 
     def run_for(self, dataset_name: str) -> None:
         dataset_samples = self.samples[dataset_name]
@@ -99,8 +124,16 @@ class IMC2025Pipeline:
                 state=state,
             )
             self._collect(image_repository, dataset_samples)
+
+        if self.delete_repo:
+            image_repository.delete_repo()
         elapsed = time.monotonic() - t0
-        LOGGER.info("`%s` finished in %.2f seconds (%.2f minutes)", dataset_name, elapsed, elapsed / 60)
+        LOGGER.info(
+            "`%s` finished in %.2f seconds (%.2f minutes)",
+            dataset_name,
+            elapsed,
+            elapsed / 60,
+        )
 
     def _collect(
         self,
@@ -140,14 +173,14 @@ def create_inmemory_repository(
 def create_h5_repository(
     dataset_name: str,
     imc2025_pipeline: IMC2025Pipeline,
+    delete_on_exit: bool = False,
 ) -> h5_repo.H5ImageRepository:
-    dataset_filepath = (
-        imc2025_pipeline.project_dirpath / "h5_repositories" 
-    )
+    dataset_filepath = imc2025_pipeline.project_dirpath / "h5_repositories"
     dataset_filepath.mkdir(exist_ok=True)
     image_repository = h5_repo.H5ImageRepository.from_filename(
         dataset_filepath,
         f"{dataset_name}.h5",
+        delete_on_exit=delete_on_exit,
     )
     image_repository.add_repository_metadata(dataset_name=dataset_name)
     return image_repository
