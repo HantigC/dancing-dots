@@ -260,6 +260,8 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
         encodings_name: str = "mast3r-encoding",
         decodings_name: str = "mast3r",
         min_matches: int = 50,
+        store_pairs: bool = True,
+        validated_pairs_name: str = "validated-mast3r-pairs",
     ) -> None:
         super().__init__()
         self.mast3r_two_step = mast3r_two_step
@@ -268,6 +270,8 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
         self.decodings_name = decodings_name
         self.min_matches = min_matches
         self.kernel_size = kernel_size
+        self.store_pairs = store_pairs
+        self.validated_pairs_name = validated_pairs_name
 
     @use_image_repository
     def run(self, image_repository: BaseImageRepository) -> None:
@@ -380,6 +384,7 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
         shapes_map: ImageShapesMap,
         pairs,
     ) -> None:
+        validated_pairs = []
         with torch.no_grad():
             for st_id, nd_id in tqdm(pairs, desc="Decoding pairs"):
                 decoded = self._decode_pair(
@@ -401,6 +406,11 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
                     )
                     continue
 
+                validated_pairs.append((st_id, nd_id))
+
+                if not self.store_pairs:
+                    continue
+
                 decoded_np = to_numpy(decoded)
                 image_repository.store_pair(
                     st_id,
@@ -408,6 +418,8 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
                     self.decodings_name,
                     decoded_np,
                 )
+
+        image_repository.store(self.validated_pairs_name, validated_pairs)
 
     def _count_validated_matches(
         self,

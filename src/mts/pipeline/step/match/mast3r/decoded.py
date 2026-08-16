@@ -8,11 +8,13 @@ import networkx as nx
 import numpy as np
 import torch
 
+from mts.core.matching.dense.mast3r import Mast3rTwoStep
 from mts.core.matching.dense.merge.round import merge_matches
 from mts.core.matching.utils.validation import validate_kps_matches
-from mts.core.scene_graph.model import Image, MatchKind, TwoViewEdge
+from mts.core.model.mast3r.io import load_model
+from mts.core.scene_graph.model import Image, MatchKind
 from mts.core.scene_graph.nx import extract_matches
-from mts.core.types import ImageId, PairType
+from mts.core.types import ImageId, PathLike
 from mts.helpers.torch.tensor import from_np
 from mts.helpers.torch.tensor import to as to_device
 from mts.pipeline.repository.base import BaseImageRepository
@@ -39,29 +41,38 @@ PruneCallable = Callable[[nx.Graph], nx.Graph]
 class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
     """Builds a scene graph purely from MASt3R pair decodings that
     `Mast3rEncodeDecodeStep` already persisted to the image repository --
-    it never runs the MASt3R model itself. It only iterates over pairs that
-    have a persisted decoding (skipped by `Mast3rEncodeDecodeStep`'s
-    `min_matches` threshold are absent), loading the cached decoded
+    it grows the graph over every pair `Mast3rEncodeDecodeStep` validated
+    (recorded under `validated_pairs_name`), loading the cached decoded
     descriptor/confidence grids and extracting/validating sparse
-    correspondences for each.
+    correspondences for each. If a validated pair's decoding was never
+    persisted (e.g. `Mast3rEncodeDecodeStep` was run with
+    `store_pairs=False`), and a `mast3r_two_step` model was configured, it
+    is recomputed on the fly from the pair's persisted per-image encodings,
+    the same way `Mast3rEncodeDecodeStep` decodes a pair.
     """
 
     def __init__(
         self,
         grow_graph: GrowCallable,
         prune_connections: PruneCallable | None = None,
+        mast3r_two_step: Mast3rTwoStep | None = None,
         decodings_name: str = "mast3r",
+        encodings_name: str = "mast3r-encoding",
         kernel_size: int = 7,
         min_conf: float = 1.01,
         device: str | torch.device = "cpu",
+        validated_pairs_name: str = "validated-mast3r-pairs",
     ) -> None:
         super().__init__()
         self.grow_graph = grow_graph
         self.prune_connections = prune_connections
+        self.mast3r_two_step = mast3r_two_step
         self.decodings_name = decodings_name
+        self.encodings_name = encodings_name
         self.kernel_size = kernel_size
         self.min_conf = min_conf
         self._device = torch.device(device)
+        self.validated_pairs_name = validated_pairs_name
 
     @property
     def device(self) -> torch.device:
@@ -72,6 +83,23 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
             self._device = torch.device(device)
         return super().to(device, *args, **kwargs)
 
+    @classmethod
+    def from_checkpoint(
+        cls,
+        mast3r_model_checkpoint: PathLike,
+        grow_graph: GrowCallable,
+        device: str | torch.device = "cpu",
+        **kwargs,
+    ) -> "Mast3rDecodedMatchPipelineStep":
+        mast3r_model = load_model(mast3r_model_checkpoint, device=device)
+        mast3r_two_step = Mast3rTwoStep(mast3r_model)
+        return cls(
+            grow_graph,
+            mast3r_two_step=mast3r_two_step,
+            device=device,
+            **kwargs,
+        )
+
     def run(
         self,
         *,
@@ -79,10 +107,8 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
         input: Any = None,
         state: dict[str, Any] = None,
     ) -> Any:
-        starting_pairs: list[PairType[ImageId]] = state["starting_pairs"]
         keypoints_map, matches_map, match_kind_map = self._compute_matches(
             image_repository,
-            starting_pairs,
         )
         self._save_matches_and_kpts(
             keypoints_map,
@@ -94,13 +120,12 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
     def _compute_matches(
         self,
         image_repository: BaseImageRepository,
-        mst_pairs: list[PairType[ImageId]],
     ) -> tuple[
         dict[str, np.ndarray],
         dict[tuple[str, str], np.ndarray],
         dict[tuple[str, str], MatchKind],
     ]:
-        scene_graph = self._create_graph(image_repository, mst_pairs)
+        scene_graph = self._create_graph(image_repository)
         if self.prune_connections is not None:
             scene_graph = self.prune_connections(scene_graph)
         matches_dict, match_kind_map = extract_matches(scene_graph)
@@ -110,15 +135,23 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
     def _create_graph(
         self,
         image_repository: BaseImageRepository,
-        mst_pairs: list[PairType[ImageId]],
     ) -> nx.Graph:
-        scene_graph = self._init_graph_from_mst(image_repository, mst_pairs)
+        scene_graph = nx.Graph().to_undirected()
+        for image_id in image_repository.image_ids():
+            height, width = image_repository.get_size_hw(image_id)
+            filepath = str(image_repository.get_filepath(image_id))
+            scene_graph.add_node(
+                filepath,
+                image=Image(height=height, width=width),
+            )
+
+        validated_pairs = image_repository.load(self.validated_pairs_name) or []
         possible_pairs = [
             (
                 str(image_repository.get_filepath(st_id)),
                 str(image_repository.get_filepath(nd_id)),
             )
-            for st_id, nd_id in image_repository.get_stored_pairs(self.decodings_name)
+            for st_id, nd_id in validated_pairs
         ]
 
         self.grow_graph(
@@ -169,13 +202,18 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
     ) -> tuple[np.ndarray, np.ndarray]:
         decoded, direction = image_repository.load_pair(st_id, nd_id, name=self.decodings_name)
         if decoded is None:
-            return np.array([]), np.array([])
-
-        decoded = to_device(from_np(decoded), device=self._device)
-        if direction == (nd_id, st_id):
-            st_features, nd_features = decoded["nd_features"], decoded["st_features"]
+            st_features, nd_features = self._recompute_pair_features(
+                image_repository, st_id, nd_id
+            )
         else:
-            st_features, nd_features = decoded["st_features"], decoded["nd_features"]
+            decoded = to_device(from_np(decoded), device=self._device)
+            if direction == (nd_id, st_id):
+                st_features, nd_features = decoded["nd_features"], decoded["st_features"]
+            else:
+                st_features, nd_features = decoded["st_features"], decoded["nd_features"]
+
+        if st_features is None or nd_features is None:
+            return np.array([]), np.array([])
 
         st_grid = DescriptorsGrid.from_tuple(st_features["conf"], st_features["desc"])
         nd_grid = DescriptorsGrid.from_tuple(nd_features["conf"], nd_features["desc"])
@@ -210,42 +248,41 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
 
         return st_kpts[inlier_matches[:, 0]], nd_kpts[inlier_matches[:, 1]]
 
-    def _init_graph_from_mst(
+    def _recompute_pair_features(
         self,
         image_repository: BaseImageRepository,
-        mst_pairs: list[PairType[ImageId]],
-    ) -> nx.Graph:
-        scene_graph = nx.Graph().to_undirected()
-        for image_id in image_repository.image_ids():
-            height, width = image_repository.get_size_hw(image_id)
-            filepath = str(image_repository.get_filepath(image_id))
-            scene_graph.add_node(
-                filepath,
-                image=Image(height=height, width=width),
+        st_id: ImageId,
+        nd_id: ImageId,
+    ) -> tuple[dict | None, dict | None]:
+        if self.mast3r_two_step is None:
+            LOGGER.warning(
+                "No persisted decoding for %s <-> %s and no MASt3R model configured "
+                "to recompute it",
+                st_id,
+                nd_id,
             )
+            return None, None
 
-        for st_id, nd_id in mst_pairs:
-            st_kpts, nd_kpts = self._decoded_pair_matches(image_repository, st_id, nd_id)
-            if len(st_kpts) == 0:
-                continue
-
-            st_filepath = str(image_repository.get_filepath(st_id))
-            nd_filepath = str(image_repository.get_filepath(nd_id))
-            num_inliers = len(st_kpts)
-            scene_graph.add_edge(
-                st_filepath,
-                nd_filepath,
-                two_view=TwoViewEdge(
-                    st_filepath=st_filepath,
-                    nd_filepath=nd_filepath,
-                    kpts_for={
-                        st_filepath: st_kpts,
-                        nd_filepath: nd_kpts,
-                    },
-                    match_kind=MatchKind.MATCHED,
-                    num_matches=num_inliers,
-                ),
-                weight=num_inliers,
-                mst=True,
+        st_encoded_np = image_repository.load(f"{self.encodings_name}_{st_id}")
+        nd_encoded_np = image_repository.load(f"{self.encodings_name}_{nd_id}")
+        if st_encoded_np is None or nd_encoded_np is None:
+            LOGGER.warning(
+                "No persisted encoding for %s <-> %s; cannot recompute decoding",
+                st_id,
+                nd_id,
             )
-        return scene_graph
+            return None, None
+
+        st_encoded = to_device(from_np(st_encoded_np), device=self._device)
+        nd_encoded = to_device(from_np(nd_encoded_np), device=self._device)
+
+        try:
+            with torch.inference_mode():
+                decoded = self.mast3r_two_step.decode_feature_pairs(st_encoded, nd_encoded)
+        except Exception:
+            LOGGER.exception(
+                "Could not recompute decoding for %s <-> %s", st_id, nd_id
+            )
+            return None, None
+
+        return decoded["st_features"], decoded["nd_features"]

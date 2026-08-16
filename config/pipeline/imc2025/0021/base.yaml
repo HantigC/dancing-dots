@@ -16,11 +16,11 @@ git_commit: None
 datasets_names: null
 save_project_to_git: False
 submission_dest_dirpath: null
-tag: DinoV2+Mast3rEncodeDecode+DecodedMatch
+tag: DinoV2(500)+Mast3rEncodeDecode+DecodedMatch
 mark: null
 zip_project: False
 zip_dest: None
-delete_repo: True
+delete_repo: False
 
 
 pipeline_steps:
