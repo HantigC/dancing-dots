@@ -260,7 +260,7 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
         encodings_name: str = "mast3r-encoding",
         decodings_name: str = "mast3r",
         min_matches: int = 50,
-        store_pairs: bool = True,
+        store_pairs: bool = False,
         validated_pairs_name: str = "validated-mast3r-pairs",
     ) -> None:
         super().__init__()
