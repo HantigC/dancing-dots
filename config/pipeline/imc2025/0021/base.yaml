@@ -55,7 +55,8 @@ pipeline_steps:
     _target_: mts.pipeline.step.base.OnDeviceRunner
     device: cuda:0
     step:
-      _target_: mts.pipeline.step.match.mast3r.decoded.Mast3rDecodedMatchPipelineStep
+      _target_: mts.pipeline.step.match.mast3r.decoded.Mast3rDecodedMatchPipelineStep.from_checkpoint
+      mast3r_model_checkpoint: "model-weights/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
       grow_graph:
         _target_: mts.core.scene_graph.transient.grow_densely
         _partial_: true
