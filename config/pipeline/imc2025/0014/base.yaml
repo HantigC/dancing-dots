@@ -5,7 +5,7 @@ description: |
   Use ColmapReconstructionStep for incremental 3D reconstruction
 
 project_path: iterations
-data_dirpath: "data/image-matching-challenge-2025"
+data_dirpath: 'data/image-matching-challenge-2025'
 sample_filepath: null
 run_type: train
 origin: None
@@ -17,7 +17,7 @@ tag: NetVlad+Mast3r+two-step
 mark: null
 zip_project: False
 zip_dest: None
-
+delete_repo: False
 
 pipeline_steps:
   embedder:
@@ -46,7 +46,7 @@ pipeline_steps:
       grow_graph:
         _target_: mts.core.scene_graph.transient.grow_densely
         _partial_: true
-      mast3r_model_checkpoint: "model-weights/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
+      mast3r_model_checkpoint: 'model-weights/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth'
       image_size: 512
       min_pairs: 50
       match_conf_th: 0.9
@@ -60,7 +60,6 @@ pipeline_steps:
       _target_: mts.helpers.colmap.options.create_incremental_pipeline_options
       min_model_size: 3
       max_num_models: 25
-
 
 reconstruction_runner:
   create_pipeline_method: app.imc2025.pipeline.create_pipeline
