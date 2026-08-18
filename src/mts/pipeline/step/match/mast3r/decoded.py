@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import networkx as nx
 import numpy as np
 import torch
 
-from mts.core.matching.dense.mast3r import Mast3rTwoStep
+from mts.core.matching.dense.mast3r import Mast3rTwoStep, NdFeatures, StFeatures
 from mts.core.matching.dense.merge.round import merge_matches
 from mts.core.matching.utils.validation import validate_kps_matches
 from mts.core.model.mast3r.io import load_model
@@ -90,7 +91,7 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
         grow_graph: GrowCallable,
         device: str | torch.device = "cpu",
         **kwargs,
-    ) -> "Mast3rDecodedMatchPipelineStep":
+    ) -> Mast3rDecodedMatchPipelineStep:
         mast3r_model = load_model(mast3r_model_checkpoint, device=device)
         mast3r_two_step = Mast3rTwoStep(mast3r_model)
         return cls(
@@ -145,7 +146,13 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
                 image=Image(height=height, width=width),
             )
 
-        validated_pairs = image_repository.load(self.validated_pairs_name) or []
+        validated_pairs = image_repository.load(self.validated_pairs_name)
+        if not validated_pairs:
+            LOGGER.info(
+                "No validated pairs found under %r; falling back to all repository pairs",
+                self.validated_pairs_name,
+            )
+            validated_pairs = image_repository.get_pairs()
         possible_pairs = [
             (
                 str(image_repository.get_filepath(st_id)),
@@ -175,14 +182,10 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
         for (st_image_filepath, nd_image_filepath), matches in matches_map.items():
             st_image_id = image_repository.get_image_id(Path(st_image_filepath))
             nd_image_id = image_repository.get_image_id(Path(nd_image_filepath))
-            image_repository.add_matches(
-                st_image_id, nd_image_id, matches, name="mast3r"
-            )
+            image_repository.add_matches(st_image_id, nd_image_id, matches, name="mast3r")
             kind = match_kind_map.get((st_image_filepath, nd_image_filepath))
             if kind is not None:
-                image_repository.upsert_match_metadata(
-                    st_image_id, nd_image_id, match_kind=kind.value
-                )
+                image_repository.upsert_match_metadata(st_image_id, nd_image_id, match_kind=kind.value)
 
     def _match_two_images(
         self,
@@ -202,9 +205,7 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
     ) -> tuple[np.ndarray, np.ndarray]:
         decoded, direction = image_repository.load_pair(st_id, nd_id, name=self.decodings_name)
         if decoded is None:
-            st_features, nd_features = self._recompute_pair_features(
-                image_repository, st_id, nd_id
-            )
+            st_features, nd_features = self._recompute_pair_features(image_repository, st_id, nd_id)
         else:
             decoded = to_device(from_np(decoded), device=self._device)
             if direction == (nd_id, st_id):
@@ -238,9 +239,7 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
         try:
             inlier_matches = validate_kps_matches(st_kpts, nd_kpts, st_hw, nd_hw)
         except Exception:
-            LOGGER.exception(
-                "Could not validate decoded matches for %s <-> %s", st_id, nd_id
-            )
+            LOGGER.exception("Could not validate decoded matches for %s <-> %s", st_id, nd_id)
             return np.array([]), np.array([])
 
         if len(inlier_matches) == 0:
@@ -253,11 +252,10 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
         image_repository: BaseImageRepository,
         st_id: ImageId,
         nd_id: ImageId,
-    ) -> tuple[dict | None, dict | None]:
+    ) -> tuple[StFeatures | None, NdFeatures | None]:
         if self.mast3r_two_step is None:
             LOGGER.warning(
-                "No persisted decoding for %s <-> %s and no MASt3R model configured "
-                "to recompute it",
+                "No persisted decoding for %s <-> %s and no MASt3R model configured to recompute it",
                 st_id,
                 nd_id,
             )
@@ -280,9 +278,7 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
             with torch.inference_mode():
                 decoded = self.mast3r_two_step.decode_feature_pairs(st_encoded, nd_encoded)
         except Exception:
-            LOGGER.exception(
-                "Could not recompute decoding for %s <-> %s", st_id, nd_id
-            )
+            LOGGER.exception("Could not recompute decoding for %s <-> %s", st_id, nd_id)
             return None, None
 
         return decoded["st_features"], decoded["nd_features"]

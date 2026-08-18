@@ -1,16 +1,12 @@
 name: IMC2025
 description: |
   Use DinoV2 global descriptors + kNN for pair creation
-  Encode every image once and decode every repository pair with MASt3R,
-  persisting both to the image repository (Mast3rEncodeDecodeStep).
-  Build the scene graph purely from those cached decodings, extracting
-  dense correspondences via extract_dense_kpts instead of the grid-based
-  sparse extraction (Mast3rDecodedDenseMatchPipelineStep) -- no further
-  MASt3R inference.
+  Match with MASt3R directly per pair (Mast3rMatchPipelineStep,
+  encode+decode on demand) -- no separate encode/decode caching step.
   Use ColmapReconstructionStep for incremental 3D reconstruction
 
 project_path: iterations
-data_dirpath: 'data/image-matching-challenge-2025'
+data_dirpath: "data/image-matching-challenge-2025"
 sample_filepath: null
 run_type: train
 origin: None
@@ -18,11 +14,12 @@ git_commit: None
 datasets_names: null
 save_project_to_git: False
 submission_dest_dirpath: null
-tag: DinoV2+Mast3rEncodeDecode+DecodedDenseMatch
+tag: DinoV2(500)+Mast3rTwoStep
 mark: null
 zip_project: False
 zip_dest: None
 delete_repo: False
+
 
 pipeline_steps:
   embedder:
@@ -41,31 +38,21 @@ pipeline_steps:
     min_distance_th: 0.0
     distance_th: 10
     max_pairs_per_image: 15
-    max_pairs: 150
-
-  mast3r_encode_decode:
-    _target_: mts.pipeline.step.base.OnDeviceRunner
-    device: cuda:0
-    step:
-      _target_: mts.pipeline.step.match.mast3r.encode_decode.Mast3rEncodeDecodeStep.from_checkpoint
-      mast3r_model_checkpoint: 'model-weights/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth'
-      image_size: 512
-      kernel_size: 7
-      min_matches: 200
+    max_pairs: 500
 
   kp_matching:
     _target_: mts.pipeline.step.base.OnDeviceRunner
     device: cuda:0
     step:
-      _target_: mts.pipeline.step.match.mast3r.decoded_dense.Mast3rDecodedDenseMatchPipelineStep
+      _target_: mts.pipeline.step.match.mast3r.two_steps.Mast3rMatchPipelineStep.from_checkpoint
+      mast3r_model_checkpoint: "model-weights/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
       grow_graph:
         _target_: mts.core.scene_graph.transient.grow_densely
         _partial_: true
-      decodings_name: mast3r
-      match_conf_th: 0.5
+      image_size: 512
       min_pairs: 50
-      pixel_tol: 0
-      top_k_matches: 2048
+      match_conf_th: 0.9
+      pixel_tol: 16
 
   reconstruction:
     _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep
@@ -75,6 +62,7 @@ pipeline_steps:
       _target_: mts.helpers.colmap.options.create_incremental_pipeline_options
       min_model_size: 3
       max_num_models: 25
+
 
 reconstruction_runner:
   create_pipeline_method: app.imc2025.pipeline.create_pipeline

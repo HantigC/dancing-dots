@@ -1,0 +1,8 @@
+
+tag: NetVLAD+Mast3rTwoStep
+pipeline_steps:
+  embedder:
+    step:
+      global_extractor:
+        _target_: mts.core.embedder.vlad.NetVladEmbedding
+        model_location: model-weights/net-vlad
