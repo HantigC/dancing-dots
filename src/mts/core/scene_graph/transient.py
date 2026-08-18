@@ -1,5 +1,5 @@
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 import networkx as nx
 import numpy as np
@@ -7,7 +7,6 @@ from tqdm.auto import tqdm
 
 from mts.core.scene_graph.model import MatchKind, TwoViewEdge
 from mts.core.scene_graph.nx import merge_path, nums
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -21,7 +20,11 @@ def match_densely(
 ) -> None:
     st_kpts, nd_kpts = extract_dense_matches(st_fpath, nd_fpath)
     if len(st_kpts) >= matches_upper_threshold:
-        LOGGER.info("Match densely (%s, %s)", st_fpath, nd_fpath,)
+        LOGGER.info(
+            "Match densely (%s, %s)",
+            st_fpath,
+            nd_fpath,
+        )
         scene_graph.add_edge(
             st_fpath,
             nd_fpath,
@@ -43,6 +46,7 @@ def grow_densely(
     scene_graph: nx.Graph,
     pairs: list[tuple[str, str]],
     extract_dense_matches: Callable[[str, str], np.ndarray],
+    min_matches: int = 500,
 ) -> None:
     for st_fpath, nd_fpath in tqdm(pairs):
         if not scene_graph.has_node(st_fpath):
@@ -58,6 +62,7 @@ def grow_densely(
                 nd_fpath,
                 scene_graph,
                 extract_dense_matches,
+                matches_upper_threshold=min_matches,
             )
 
 
@@ -65,6 +70,7 @@ def grow_merging(
     scene_graph: nx.Graph,
     pairs: list[tuple[str, str]],
     extract_dense_matches: Callable[[str, str], np.ndarray],
+    min_matches: int = 500,
 ) -> None:
     for st_fpath, nd_fpath in tqdm(pairs):
         if not scene_graph.has_node(st_fpath):
@@ -75,12 +81,10 @@ def grow_merging(
             continue
         merged = False
         if not scene_graph.has_edge(st_fpath, nd_fpath):
-            for kpts_path in list(
-                nx.all_simple_paths(scene_graph, st_fpath, nd_fpath, cutoff=2)
-            ):
+            for kpts_path in list(nx.all_simple_paths(scene_graph, st_fpath, nd_fpath, cutoff=2)):
                 # TODO: Check if it can be reconstructed from different paths
                 two_view: TwoViewEdge | None = merge_path(scene_graph, kpts_path)
-                if two_view is not None and two_view.num_matches > 500:
+                if two_view is not None and two_view.num_matches > min_matches:
                     node_from, via, node_to = kpts_path
                     scene_graph.add_edge(
                         node_from,
@@ -108,4 +112,5 @@ def grow_merging(
                 nd_fpath,
                 scene_graph,
                 extract_dense_matches,
+                matches_upper_threshold=min_matches,
             )
