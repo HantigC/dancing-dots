@@ -1,5 +1,5 @@
 
-tag: NetVLAD+Mast3rTwoStep
+tag: NetVLAD+DecodedMatch
 pipeline_steps:
   embedder:
     step:

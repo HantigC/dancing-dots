@@ -1,8 +1,11 @@
 name: IMC2025
 description: |
   Use DinoV2 global descriptors + kNN for pair creation
-  Match with MASt3R directly per pair (Mast3rMatchPipelineStep,
-  encode+decode on demand) -- no separate encode/decode caching step.
+  Match with MASt3R directly per pair (Mast3rDecodedMatchPipelineStep,
+  falling back to all repository pairs and encoding/decoding on demand
+  since there is no separate encode/decode caching step). Encodings
+  computed on the fly are kept in memory for the run but not persisted
+  back to the repository (store_encodings: False, the default).
   Use ColmapReconstructionStep for incremental 3D reconstruction
 
 project_path: iterations
@@ -14,7 +17,7 @@ git_commit: None
 datasets_names: null
 save_project_to_git: False
 submission_dest_dirpath: null
-tag: DinoV2(500)+Mast3rTwoStep
+tag: DinoV2(500)+DecodedMatch
 mark: null
 zip_project: False
 zip_dest: None
@@ -44,15 +47,15 @@ pipeline_steps:
     _target_: mts.pipeline.step.base.OnDeviceRunner
     device: cuda:0
     step:
-      _target_: mts.pipeline.step.match.mast3r.two_steps.Mast3rMatchPipelineStep.from_checkpoint
+      _target_: mts.pipeline.step.match.mast3r.decoded.Mast3rDecodedMatchPipelineStep.from_checkpoint
       mast3r_model_checkpoint: "model-weights/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
       grow_graph:
         _target_: mts.core.scene_graph.transient.grow_densely
         _partial_: true
+      decodings_name: mast3r
       image_size: 512
-      min_pairs: 50
-      match_conf_th: 0.9
-      pixel_tol: 16
+      kernel_size: 5
+      min_conf: 1.01
 
   reconstruction:
     _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep

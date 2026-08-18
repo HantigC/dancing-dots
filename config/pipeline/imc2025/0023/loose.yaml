@@ -1,5 +1,5 @@
 
-tag: DinoV2(3000)+Mast3rTwoStep
+tag: DinoV2(3000)+DecodedMatch
 pipeline_steps:
   pairing:
     k: 60

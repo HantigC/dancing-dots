@@ -36,16 +36,12 @@ class DescriptorsGrid(TypedDict):
     def from_tuple(cls, conf, desc) -> "DescriptorsGrid":
         if desc.ndim == 4:
             if desc.shape[0] != 1:
-                raise ValueError(
-                    f"descriptors should have batch size of 1, not {desc.shape[0]}"
-                )
+                raise ValueError(f"descriptors should have batch size of 1, not {desc.shape[0]}")
             desc = desc.squeeze(0)
 
         if conf.ndim == 3:
             if conf.shape[0] != 1:
-                raise ValueError(
-                    f"confidence should have batch size of 1, not {conf.shape[0]}"
-                )
+                raise ValueError(f"confidence should have batch size of 1, not {conf.shape[0]}")
             conf = conf.squeeze(0)
 
         return {
@@ -59,7 +55,11 @@ class KeypointsDescriptors(TypedDict):
     coords: torch.Tensor | np.ndarray
 
     @classmethod
-    def from_tuple(cls, desc, coords) -> "KeypointsDescriptors":
+    def from_tuple(
+        cls,
+        desc: torch.Tensor,
+        coords: torch.Tensor | np.ndarray,
+    ) -> "KeypointsDescriptors":
         return {
             "desc": desc,
             "coords": coords,
@@ -174,7 +174,7 @@ def extract_sparse_matches(
     st_features: DescriptorsGrid,
     nd_features: DescriptorsGrid,
     device: str | torch.device | None = None,
-    kernel_size=7,
+    kernel_size: int = 7,
     min_conf: float = 1.01,
     st_original_size: ImageSizeHW | None = None,
     nd_original_size: ImageSizeHW | None = None,
@@ -201,7 +201,10 @@ def extract_sparse_matches(
     )
 
     if len(st_rows) == 0 and len(st_cols) == 0:
-        return np.array([]), np.array([]),
+        return (
+            np.array([]),
+            np.array([]),
+        )
     nd_rows, nd_cols = get_coords(
         nd_conf,
         kernel_size=kernel_size,
@@ -237,9 +240,7 @@ def extract_sparse_matches(
             st_matched_kpts,
             st_original_size,
         )
-        nd_matched_kpts = transform_keypoints_to_original(
-            nd_matched_kpts, nd_original_size
-        )
+        nd_matched_kpts = transform_keypoints_to_original(nd_matched_kpts, nd_original_size)
     return st_matched_kpts, nd_matched_kpts
 
 
@@ -321,9 +322,7 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
         image_repository: BaseImageRepository,
     ) -> tuple[EncodedImageMap, ImageShapesMap]:
         image_ids = list(image_repository.image_ids())
-        image_filepaths = [
-            str(image_repository.get_filepath(image_id)) for image_id in image_ids
-        ]
+        image_filepaths = [str(image_repository.get_filepath(image_id)) for image_id in image_ids]
         images = load_images(
             image_filepaths,
             size=self.image_size,
@@ -338,9 +337,7 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
                 encoded_cpu = to(encoded_image_features, device=torch.device("cpu"))
                 encoded_map[image_id] = encoded_cpu
                 shapes_map[image_id] = true_shape
-                self._persist_encoding(
-                    image_repository, image_id, encoded_cpu, true_shape
-                )
+                self._persist_encoding(image_repository, image_id, encoded_cpu, true_shape)
 
         return encoded_map, shapes_map
 
@@ -364,15 +361,11 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
     ):
         return self.mast3r_two_step.decode_feature_pairs(
             to(
-                EncodedImageFeaturesDict.from_add_shape(
-                    st_encoded_image_features, st_true_shape
-                ),
+                EncodedImageFeaturesDict.from_add_shape(st_encoded_image_features, st_true_shape),
                 device=self.device,
             ),
             to(
-                EncodedImageFeaturesDict.from_add_shape(
-                    nd_encoded_image_features, nd_true_shape
-                ),
+                EncodedImageFeaturesDict.from_add_shape(nd_encoded_image_features, nd_true_shape),
                 device=self.device,
             ),
         )
@@ -393,9 +386,7 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
                     shapes_map[st_id],
                     shapes_map[nd_id],
                 )
-                num_matches = self._count_validated_matches(
-                    image_repository, st_id, nd_id, decoded
-                )
+                num_matches = self._count_validated_matches(image_repository, st_id, nd_id, decoded)
                 if num_matches < self.min_matches:
                     LOGGER.debug(
                         "Skipping decoding for pair (%s, %s): %d validated matches < min_matches=%d",
@@ -449,7 +440,6 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
             return 0
 
         try:
-
             st_kpts = st_kpts[..., ::-1]
             nd_kpts = nd_kpts[..., ::-1]
             inlier_matches = validate_kps_matches(
@@ -459,9 +449,7 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
                 nd_original_size,
             )
         except Exception:
-            LOGGER.exception(
-                "Two-view validation failed for pair (%s, %s)", st_id, nd_id
-            )
+            LOGGER.exception("Two-view validation failed for pair (%s, %s)", st_id, nd_id)
             return 0
 
         return len(inlier_matches)

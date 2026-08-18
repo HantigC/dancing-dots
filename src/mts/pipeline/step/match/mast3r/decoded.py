@@ -8,15 +8,21 @@ from typing import Any
 import networkx as nx
 import numpy as np
 import torch
+from dust3r.utils.image import load_images
 
-from mts.core.matching.dense.mast3r import Mast3rTwoStep, NdFeatures, StFeatures
+from mts.core.matching.dense.mast3r import (
+    EncodedImageFeaturesDict,
+    Mast3rTwoStep,
+    NdFeatures,
+    StFeatures,
+)
 from mts.core.matching.dense.merge.round import merge_matches
 from mts.core.matching.utils.validation import validate_kps_matches
 from mts.core.model.mast3r.io import load_model
 from mts.core.scene_graph.model import Image, MatchKind
 from mts.core.scene_graph.nx import extract_matches
 from mts.core.types import ImageId, PathLike
-from mts.helpers.torch.tensor import from_np
+from mts.helpers.torch.tensor import from_np, to_numpy
 from mts.helpers.torch.tensor import to as to_device
 from mts.pipeline.repository.base import BaseImageRepository
 from mts.pipeline.step.base import BasePipelineStep
@@ -49,7 +55,18 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
     persisted (e.g. `Mast3rEncodeDecodeStep` was run with
     `store_pairs=False`), and a `mast3r_two_step` model was configured, it
     is recomputed on the fly from the pair's persisted per-image encodings,
-    the same way `Mast3rEncodeDecodeStep` decodes a pair.
+    the same way `Mast3rEncodeDecodeStep` decodes a pair. If an image's
+    encoding was never persisted either (e.g. there is no
+    `Mast3rEncodeDecodeStep` in the pipeline at all), it is encoded on the
+    fly from the source image instead, the same way
+    `Mast3rEncodeDecodeStep._encode_all_images` does; that encoding is only
+    persisted back to the repository when `store_encodings=True`. Every
+    encoding obtained this way -- from the repository, freshly computed,
+    or already cached -- is kept in an in-memory cache for the rest of
+    the run so it is never fetched/computed twice; that cache holds
+    tensors on `device` only when `cache_encodings_on_device=True`,
+    otherwise it holds them on CPU (moved to `device` on each lookup) so
+    the cache doesn't pin every image's encoding in GPU/MPS memory.
     """
 
     def __init__(
@@ -59,10 +76,13 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
         mast3r_two_step: Mast3rTwoStep | None = None,
         decodings_name: str = "mast3r",
         encodings_name: str = "mast3r-encoding",
+        image_size: int = 512,
         kernel_size: int = 7,
         min_conf: float = 1.01,
         device: str | torch.device = "cpu",
         validated_pairs_name: str = "validated-mast3r-pairs",
+        store_encodings: bool = False,
+        cache_encodings_on_device: bool = False,
     ) -> None:
         super().__init__()
         self.grow_graph = grow_graph
@@ -70,10 +90,14 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
         self.mast3r_two_step = mast3r_two_step
         self.decodings_name = decodings_name
         self.encodings_name = encodings_name
+        self.image_size = image_size
         self.kernel_size = kernel_size
         self.min_conf = min_conf
         self._device = torch.device(device)
         self.validated_pairs_name = validated_pairs_name
+        self.store_encodings = store_encodings
+        self.cache_encodings_on_device = cache_encodings_on_device
+        self._encoding_cache: dict[ImageId, EncodedImageFeaturesDict] = {}
 
     @property
     def device(self) -> torch.device:
@@ -261,18 +285,15 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
             )
             return None, None
 
-        st_encoded_np = image_repository.load(f"{self.encodings_name}_{st_id}")
-        nd_encoded_np = image_repository.load(f"{self.encodings_name}_{nd_id}")
-        if st_encoded_np is None or nd_encoded_np is None:
+        st_encoded = self._get_encoding(image_repository, st_id)
+        nd_encoded = self._get_encoding(image_repository, nd_id)
+        if st_encoded is None or nd_encoded is None:
             LOGGER.warning(
-                "No persisted encoding for %s <-> %s; cannot recompute decoding",
+                "Could not obtain a MASt3R encoding for %s <-> %s; cannot recompute decoding",
                 st_id,
                 nd_id,
             )
             return None, None
-
-        st_encoded = to_device(from_np(st_encoded_np), device=self._device)
-        nd_encoded = to_device(from_np(nd_encoded_np), device=self._device)
 
         try:
             with torch.inference_mode():
@@ -282,3 +303,77 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
             return None, None
 
         return decoded["st_features"], decoded["nd_features"]
+
+    def _get_encoding(
+        self,
+        image_repository: BaseImageRepository,
+        image_id: ImageId,
+    ) -> EncodedImageFeaturesDict | None:
+        cached = self._encoding_cache.get(image_id)
+        if cached is not None:
+            if self.cache_encodings_on_device:
+                return cached
+            return to_device(cached, device=self._device)
+
+        encoded_np = image_repository.load(f"{self.encodings_name}_{image_id}")
+        if encoded_np is not None:
+            cpu_encoded = from_np(encoded_np)
+            self._cache_encoding(image_id, cpu_encoded)
+            return to_device(cpu_encoded, device=self._device)
+
+        device_encoded = self._encode_image(image_repository, image_id)
+        if device_encoded is None:
+            return None
+
+        if self.store_encodings:
+            image_repository.store(f"{self.encodings_name}_{image_id}", to_numpy(device_encoded))
+
+        self._cache_encoding(image_id, to_device(device_encoded, device=torch.device("cpu")))
+        return device_encoded
+
+    def _cache_encoding(
+        self,
+        image_id: ImageId,
+        cpu_encoded: EncodedImageFeaturesDict,
+    ) -> None:
+        if self.cache_encodings_on_device:
+            self._encoding_cache[image_id] = to_device(cpu_encoded, device=self._device)
+        else:
+            self._encoding_cache[image_id] = cpu_encoded
+
+    def _encode_image(
+        self,
+        image_repository: BaseImageRepository,
+        image_id: ImageId,
+    ) -> EncodedImageFeaturesDict | None:
+        filepath = str(image_repository.get_filepath(image_id))
+        try:
+            image = load_images([filepath], size=self.image_size, verbose=False)[0]
+        except Exception:
+            LOGGER.exception("Could not load image %s for on-the-fly MASt3R encoding", image_id)
+            return None
+
+        ignore_keys = {"depthmap", "dataset", "label", "instance", "idx", "true_shape", "rng"}
+        for name in image.keys():
+            if name in ignore_keys:
+                continue
+            image[name] = image[name].to(self._device, non_blocking=True)
+
+        img = image["img"]
+        true_shape = image.get("true_shape")
+        if true_shape is not None:
+            if isinstance(true_shape, np.ndarray):
+                true_shape = torch.from_numpy(true_shape)
+        else:
+            true_shape = torch.tensor(img.shape[-2:])[None].repeat(img.shape[0], 1)
+
+        try:
+            with torch.inference_mode():
+                encoded_image_dict = self.mast3r_two_step.encode_image(
+                    {"image": img, "true_shape": true_shape},
+                )
+        except Exception:
+            LOGGER.exception("Could not encode image %s for on-the-fly MASt3R decoding", image_id)
+            return None
+
+        return EncodedImageFeaturesDict.from_add_shape(encoded_image_dict, true_shape)
