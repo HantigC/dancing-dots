@@ -7,6 +7,10 @@ pipeline_steps:
       global_extractor:
         model_location: /kaggle/input/models/hantig/fb-dinov2/pytorch/default/1/snapshots/f9e44c814b77203eaa57a6bdbbd535f21ede1415
 
+  mast3r_encode_decode:
+    step:
+      mast3r_model_checkpoint: "/kaggle/input/models/hantig/mast3r/pytorch/default/3/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
+
   kp_matching:
     step:
       mast3r_model_checkpoint: "/kaggle/input/models/hantig/mast3r/pytorch/default/3/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"

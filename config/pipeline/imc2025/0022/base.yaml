@@ -3,10 +3,8 @@ description: |
   Use DinoV2 global descriptors + kNN for pair creation
   Encode every image once and decode every repository pair with MASt3R,
   persisting both to the image repository (Mast3rEncodeDecodeStep).
-  Build the scene graph purely from those cached decodings, extracting
-  dense correspondences via extract_dense_kpts instead of the grid-based
-  sparse extraction (Mast3rDecodedDenseMatchPipelineStep) -- no further
-  MASt3R inference.
+  Build the scene graph purely from those cached decodings
+  (Mast3rDecodedMatchPipelineStep) -- no further MASt3R inference.
   Use ColmapReconstructionStep for incremental 3D reconstruction
 
 project_path: iterations
@@ -18,7 +16,7 @@ git_commit: None
 datasets_names: null
 save_project_to_git: False
 submission_dest_dirpath: null
-tag: DinoV2+Mast3rEncodeDecode+DecodedDenseMatch
+tag: DinoV2+Mast3rEncodeDecode+DecodedMatch
 mark: null
 zip_project: False
 zip_dest: None
@@ -57,15 +55,14 @@ pipeline_steps:
     _target_: mts.pipeline.step.base.OnDeviceRunner
     device: cuda:0
     step:
-      _target_: mts.pipeline.step.match.mast3r.decoded_dense.Mast3rDecodedDenseMatchPipelineStep
+      _target_: mts.pipeline.step.match.mast3r.decoded.Mast3rDecodedMatchPipelineStep.from_checkpoint
+      mast3r_model_checkpoint: 'model-weights/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth'
       grow_graph:
         _target_: mts.core.scene_graph.transient.grow_densely
         _partial_: true
       decodings_name: mast3r
-      match_conf_th: 0.5
-      min_pairs: 50
-      pixel_tol: 0
-      top_k_matches: 2048
+      kernel_size: 5
+      min_conf: 1.01
 
   reconstruction:
     _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep
