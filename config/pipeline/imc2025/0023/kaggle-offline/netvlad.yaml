@@ -1,0 +1,6 @@
+pipeline_steps:
+  embedder:
+    step:
+      global_extractor:
+        _target_: mts.core.embedder.vlad.NetVladEmbedding
+        model_location: /kaggle/input/models/hantig/net-vlad/pytorch/default/1
