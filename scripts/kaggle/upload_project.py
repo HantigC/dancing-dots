@@ -18,6 +18,7 @@ IGNORE_PATTERNS = [
     "data/",
     # output directories
     "iterations/",
+    "kaggle-iterations/",
     "runs/",
     "tmp/",
     # local tooling
