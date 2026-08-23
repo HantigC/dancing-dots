@@ -62,9 +62,6 @@ dev = [
 ]
 [tool.uv]
 package = true
-override-dependencies = [
-    "lightglue",
-]
 
 [tool.uv.extra-build-dependencies]
 asmk = [
@@ -90,13 +87,13 @@ where = ["src"]
 app = ["logging/*.yaml"]
 
 [tool.uv.sources]
-hloc = { git = "https://github.com/cvg/Hierarchical-Localization.git" }
 croco = { path = "deps/whls/croco-0.1.2-py3-none-any.whl" }
 dust3r = { path = "deps/whls/dust3r-0.1.0-py3-none-any.whl" }
 mast3r = { path = "deps/whls/mast3r-0.1.0-py3-none-any.whl" }
 asmk = { path = "deps/submodules/asmk" }
 lightglue = { path = "deps/submodules/lightglue", editable = true}
 gim = { path = "deps/submodules/gim", editable = true }
+hloc = { path = "deps/submodules/Hierarchical-Localization" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -7,3 +7,6 @@
 [submodule "deps/submodules/lightglue"]
 	path = deps/submodules/lightglue
 	url = https://github.com/HantigC/LightGlue.git
+[submodule "deps/submodules/Hierarchical-Localization"]
+	path = deps/submodules/Hierarchical-Localization
+	url = https://github.com/HantigC/Hierarchical-Localization.git

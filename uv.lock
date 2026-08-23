@@ -752,7 +752,7 @@ provides-extras = ["kaggle"]
 build = [{ name = "setuptools", specifier = ">=80.9.0" }]
 dev = [
     { name = "cython", specifier = ">=3.2.4" },
-    { name = "hloc", git = "https://github.com/cvg/Hierarchical-Localization.git" },
+    { name = "hloc", directory = "deps/submodules/Hierarchical-Localization" },
     { name = "ipykernel", specifier = ">=7.1.0" },
     { name = "jupytext", specifier = ">=1.19.5" },
     { name = "kaleido", specifier = ">=1.0.0" },
@@ -1214,7 +1214,7 @@ wheels = [
 [[package]]
 name = "hloc"
 version = "1.5"
-source = { git = "https://github.com/cvg/Hierarchical-Localization.git#c13273bd0ecc2917a35910fd843712a1c6243193" }
+source = { directory = "deps/submodules/Hierarchical-Localization" }
 dependencies = [
     { name = "gdown" },
     { name = "h5py" },
@@ -1230,6 +1230,23 @@ dependencies = [
     { name = "torch" },
     { name = "torchvision" },
     { name = "tqdm" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "gdown" },
+    { name = "h5py" },
+    { name = "kornia", specifier = ">=0.6.11" },
+    { name = "lightglue" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "opencv-python" },
+    { name = "plotly" },
+    { name = "pycolmap", specifier = ">=3.13.0" },
+    { name = "scipy" },
+    { name = "torch", specifier = ">=1.1" },
+    { name = "torchvision", specifier = ">=0.3" },
+    { name = "tqdm", specifier = ">=4.36.0" },
 ]
 
 [[package]]
