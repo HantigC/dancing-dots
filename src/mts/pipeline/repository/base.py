@@ -7,6 +7,8 @@ from PIL import Image
 
 from mts.core.types import ImageId, PairType
 
+DEFAULT_SCENE = "base"
+
 
 class BaseImageRepository(ABC):
     """Abstract base class for image repositories.
@@ -55,11 +57,16 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
-    def add_image(self, filepath: str) -> ImageId:
+    def add_image(self, filepath: str, scene: str | None = None) -> ImageId:
         """Adds an image to the repository.
 
         Args:
             filepath: Path to the image file.
+            scene: Scene this image belongs to. Scenes aren't a separate
+                registry that must be created upfront — assigning an image
+                to a scene name that hasn't been used before implicitly
+                creates it. If None (default), the image is assigned to the
+                default scene, `DEFAULT_SCENE` ("base").
 
         Returns:
             The unique identifier assigned to the image.
@@ -67,8 +74,34 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
-    def image_ids(self) -> Generator[ImageId, None, None]:
-        """Iterates over all stored image IDs.
+    def add_scene(self, image_id: ImageId, scene: str) -> None:
+        """Assigns (or reassigns) the scene an image belongs to.
+
+        Args:
+            image_id: The image identifier.
+            scene: The scene name.
+        """
+        pass
+
+    @abstractmethod
+    def get_scene(self, image_id: ImageId) -> str | None:
+        """Retrieves the scene assigned to an image.
+
+        Args:
+            image_id: The image identifier.
+
+        Returns:
+            The scene name, or None if the image has no scene assigned.
+        """
+        pass
+
+    @abstractmethod
+    def image_ids(self, scene: str | None = None) -> Generator[ImageId, None, None]:
+        """Iterates over stored image IDs.
+
+        Args:
+            scene: If given, yields only image IDs assigned to this scene.
+                If None (default), yields all image IDs regardless of scene.
 
         Yields:
             The identifier of each stored image.
@@ -390,14 +423,23 @@ class BaseImageRepository(ABC):
     def add_pairs(self, pairs: list[PairType[int]]) -> None:
         """Stores image ID pairs.
 
+        Each pair's scene is resolved from its endpoints' assigned scene
+        (see `add_scene`/`add_image`). A pair whose two endpoints belong to
+        different scenes raises `RepositoryException` — pairing is only
+        ever expected to happen within one scene.
+
         Args:
             pairs: A list of image ID pairs.
         """
         pass
 
     @abstractmethod
-    def get_pairs(self) -> list[PairType]:
-        """Retrieves all stored image ID pairs.
+    def get_pairs(self, scene: str | None = None) -> list[PairType]:
+        """Retrieves stored image ID pairs.
+
+        Args:
+            scene: If given, returns only pairs stored under this scene.
+                If None (default), returns all pairs regardless of scene.
 
         Returns:
             A list of image ID pairs.

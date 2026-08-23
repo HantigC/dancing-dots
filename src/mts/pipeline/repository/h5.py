@@ -14,7 +14,7 @@ from mts.core.geometry.rigid3d import Rigid3D
 from mts.core.types import ImageId, PairType, PathLike
 from mts.utils.image import imread_rgb
 
-from .base import BaseImageRepository
+from .base import DEFAULT_SCENE, BaseImageRepository, RepositoryException
 
 LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +30,7 @@ class H5ImageRepository(BaseImageRepository):
         self._h5 = None
         self._image_id_to_filepath = {}
         self._filepath_to_image_id = {}
+        self._image_id_to_scene = {}
         self.delete_on_exit = delete_on_exit
         self._init_maps()
         if create_open:
@@ -40,11 +41,16 @@ class H5ImageRepository(BaseImageRepository):
             return
         with self._reading() as h5_read:
             for image_id in h5_read.get("images", {}).keys():
-                filepath = h5_read["images"][image_id].attrs["filepath"]
+                grp = h5_read["images"][image_id]
+                filepath = grp.attrs["filepath"]
                 self._image_id_to_filepath[int(image_id)] = filepath
                 self._filepath_to_image_id[filepath] = int(image_id)
+                scene = grp.attrs.get("scene")
+                if scene is not None:
+                    self._image_id_to_scene[int(image_id)] = scene
 
     _DIRECTIONS_GROUP = "__directions__"
+    _NO_SCENE_KEY = "__unscoped__"
 
     @staticmethod
     def _pair_key(img_id1: int, img_id2: int) -> str:
@@ -110,6 +116,14 @@ class H5ImageRepository(BaseImageRepository):
     @property
     def _pair_store_grp(self):
         return self._h5.require_group("pair_store")
+
+    @property
+    def _pairs_grp(self):
+        return self._h5.require_group("pairs")
+
+    @property
+    def _scenes_grp(self):
+        return self._h5.require_group("scenes")
 
     def _get_file_for_reading(self):
         already_open = self._h5 is not None and self._h5.id.valid
@@ -183,7 +197,7 @@ class H5ImageRepository(BaseImageRepository):
             for k, v in kwargs.items():
                 self._repo_meta_write(self._repo_meta, k, v)
 
-    def add_image(self, filepath: PathLike) -> int:
+    def add_image(self, filepath: PathLike, scene: str | None = None) -> int:
         with self:
             filepath = str(filepath)
             image_id = self._filepath_to_image_id.get(filepath)
@@ -198,14 +212,58 @@ class H5ImageRepository(BaseImageRepository):
             grp.attrs["filepath"] = filepath
 
             self._h5.attrs["next_id"] += 1
+
+            self.add_scene(img_id, scene or DEFAULT_SCENE)
         return img_id
 
-    def image_ids(self) -> Generator[int, None, None]:
+    def _append_to_scene_index(self, scene: str, image_id: int) -> None:
+        ds = self._scenes_grp.require_dataset(
+            scene, shape=(0,), maxshape=(None,), dtype=np.int64
+        )
+        n = len(ds)
+        ds.resize((n + 1,))
+        ds[n] = image_id
+
+    def _remove_from_scene_index(self, scene: str, image_id: int) -> None:
+        scenes_grp = self._scenes_grp
+        if scene not in scenes_grp:
+            return
+        ds = scenes_grp[scene]
+        remaining = ds[:][ds[:] != image_id]
+        ds.resize((len(remaining),))
+        ds[:] = remaining
+
+    def add_scene(self, image_id: ImageId, scene: str) -> None:
+        with self:
+            image_id = int(image_id)
+            grp = self._images_grp.require_group(str(image_id))
+            grp.attrs["scene"] = scene
+
+            old_scene = self._image_id_to_scene.get(image_id)
+            if old_scene != scene:
+                if old_scene is not None:
+                    self._remove_from_scene_index(old_scene, image_id)
+                self._append_to_scene_index(scene, image_id)
+
+            self._image_id_to_scene[image_id] = scene
+
+    def get_scene(self, image_id: ImageId) -> str | None:
+        return self._image_id_to_scene.get(int(image_id))
+
+    def image_ids(self, scene: str | None = None) -> Generator[int, None, None]:
+        if scene is None:
+            with self._reading() as h5_read:
+                images_grp = h5_read.get("images")
+                if images_grp is None:
+                    return
+                yield from (int(k) for k in images_grp.keys())
+            return
+
         with self._reading() as h5_read:
-            images_grp = h5_read.get("images")
-            if images_grp is None:
+            scenes_grp = h5_read.get("scenes")
+            if scenes_grp is None or scene not in scenes_grp:
                 return
-            yield from (int(k) for k in images_grp.keys())
+            yield from (int(image_id) for image_id in scenes_grp[scene][:])
 
     def images_num(self):
         with self._reading() as h5_read:
@@ -598,27 +656,50 @@ class H5ImageRepository(BaseImageRepository):
 
     def add_pairs(self, pairs):
         with self:
-            ds = self._h5.require_dataset(
-                "pairs",
-                shape=(0, 2),
-                maxshape=(None, 2),
-                dtype=np.int64,
-            )
-            n = len(ds)
-            ds.resize((n + len(pairs), 2))
-            ds[n:] = np.array([sorted(p) for p in pairs])
+            by_scene: dict[str, list[tuple[int, int]]] = {}
+            for pair in pairs:
+                id1, id2 = sorted(pair)
+                scene1 = self._image_id_to_scene.get(int(id1))
+                scene2 = self._image_id_to_scene.get(int(id2))
+                if scene1 != scene2:
+                    raise RepositoryException(
+                        f"Pair ({id1}, {id2}) spans scenes `{scene1}` and `{scene2}`"
+                    )
+                key = scene1 if scene1 is not None else self._NO_SCENE_KEY
+                by_scene.setdefault(key, []).append((id1, id2))
 
-    def get_pairs(self):
+            pairs_grp = self._pairs_grp
+            for key, group_pairs in by_scene.items():
+                ds = pairs_grp.require_dataset(
+                    key,
+                    shape=(0, 2),
+                    maxshape=(None, 2),
+                    dtype=np.int64,
+                )
+                n = len(ds)
+                ds.resize((n + len(group_pairs), 2))
+                ds[n:] = np.array(group_pairs)
+
+    def get_pairs(self, scene: str | None = None):
         with self._reading() as h5_read:
-            if "pairs" not in h5_read:
+            pairs_grp = h5_read.get("pairs")
+            if pairs_grp is None:
                 return []
-            return h5_read["pairs"][:].tolist()
+            if scene is not None:
+                if scene not in pairs_grp:
+                    return []
+                return pairs_grp[scene][:].tolist()
+            all_pairs = []
+            for ds in pairs_grp.values():
+                all_pairs.extend(ds[:].tolist())
+            return all_pairs
 
     def pair_num(self):
         with self._reading() as h5_read:
-            if "pairs" not in h5_read:
+            pairs_grp = h5_read.get("pairs")
+            if pairs_grp is None:
                 return 0
-            return len(h5_read["pairs"][:])
+            return sum(len(ds) for ds in pairs_grp.values())
 
     def close(self):
         self._h5.close()
