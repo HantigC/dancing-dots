@@ -7,7 +7,13 @@ from mts.core.geometry.rigid3d import Rigid3D
 from mts.core.types import ImageId, PairType, PathLike
 from mts.utils.image import imread_rgb
 
-from .base import AlreadyExistsException, BaseImageRepository, NotFoundException
+from .base import (
+    DEFAULT_SCENE,
+    AlreadyExistsException,
+    BaseImageRepository,
+    NotFoundException,
+    RepositoryException,
+)
 
 
 
@@ -31,6 +37,8 @@ class ImageRepository(BaseImageRepository):
         self._match_metadata: dict[tuple, dict[str, Any]] = {}
         self._pairs_map = {}
         self._pairs = []
+        self._pairs_by_scene: dict[str, list[tuple]] = {}
+        self._image_scene: dict[ImageId, str] = {}
         self._poses: dict[ImageId, Rigid3D] = {}
         self._metadata: dict[ImageId, dict[str, Any]] = {}
         self._store: dict[str, Any] = {}
@@ -57,7 +65,7 @@ class ImageRepository(BaseImageRepository):
     def get_repository_metadata(self, name: str):
         return self._repository_metadata.get(name)
 
-    def add_image(self, filepath: str) -> int:
+    def add_image(self, filepath: str, scene: str | None = None) -> int:
         """Add an image filepath and return its integer ID."""
         if filepath in self._images_filepath:
             return self._images_filepath[filepath]
@@ -66,11 +74,19 @@ class ImageRepository(BaseImageRepository):
         self._images_filepath[filepath] = img_id
         self._id_to_filepath[img_id] = filepath
         self._next_id += 1
+        self.add_scene(img_id, scene or DEFAULT_SCENE)
         return img_id
 
-    def image_ids(self) -> Generator[int, None, None]:
+    def add_scene(self, image_id: ImageId, scene: str) -> None:
+        self._image_scene[image_id] = scene
+
+    def get_scene(self, image_id: ImageId) -> str | None:
+        return self._image_scene.get(image_id)
+
+    def image_ids(self, scene: str | None = None) -> Generator[int, None, None]:
         for id in self._id_to_filepath:
-            yield id
+            if scene is None or self._image_scene.get(id) == scene:
+                yield id
 
     def images_num(self):
         return len(self._images_filepath)
@@ -194,10 +210,21 @@ class ImageRepository(BaseImageRepository):
         for st_id, nd_id in pairs:
             self._pairs_map.setdefault(st_id, []).append(nd_id)
             self._pairs_map.setdefault(nd_id, []).append(st_id)
-        self._pairs.extend([tuple(sorted(pair)) for pair in pairs])
+        for pair in pairs:
+            id1, id2 = tuple(sorted(pair))
+            scene1 = self._image_scene.get(id1)
+            scene2 = self._image_scene.get(id2)
+            if scene1 != scene2:
+                raise RepositoryException(
+                    f"Pair ({id1}, {id2}) spans scenes `{scene1}` and `{scene2}`"
+                )
+            self._pairs.append((id1, id2))
+            self._pairs_by_scene.setdefault(scene1, []).append((id1, id2))
 
-    def get_pairs(self) -> list[PairType[ImageId]]:
-        return self._pairs
+    def get_pairs(self, scene: str | None = None) -> list[PairType[ImageId]]:
+        if scene is None:
+            return self._pairs
+        return self._pairs_by_scene.get(scene, [])
 
     def pair_num(self) -> int:
         return len(self._pairs)

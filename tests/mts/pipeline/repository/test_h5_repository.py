@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from mts.core.geometry.rigid3d import Rigid3D
+from mts.pipeline.repository.base import DEFAULT_SCENE, RepositoryException
 from mts.pipeline.repository.h5 import H5ImageRepository
 
 
@@ -146,3 +147,79 @@ def test_get_stored_pairs(repo):
     id_b = repo.add_image("b.jpg")
     repo.store_pair(id_a, id_b, "homography", {"h": 1})
     assert repo.get_stored_pairs("homography") == [(id_a, id_b)]
+
+
+# --- scenes (new behavior) -------------------------------------------------
+
+
+def test_add_image_defaults_to_base_scene(repo):
+    img_id = repo.add_image("a.jpg")
+    assert repo.get_scene(img_id) == DEFAULT_SCENE == "base"
+
+
+def test_add_image_with_explicit_scene(repo):
+    img_id = repo.add_image("a.jpg", scene="scene_a")
+    assert repo.get_scene(img_id) == "scene_a"
+
+
+def test_add_scene_overwrites_previous_value(repo):
+    img_id = repo.add_image("a.jpg", scene="scene_a")
+    repo.add_scene(img_id, "scene_b")
+    assert repo.get_scene(img_id) == "scene_b"
+
+
+def test_image_ids_reflects_scene_reassignment(repo):
+    """add_scene must move the image between the per-scene indexes used by
+    image_ids(scene=...), not just update the get_scene cache."""
+    img_id = repo.add_image("a.jpg", scene="scene_a")
+    other_id = repo.add_image("b.jpg", scene="scene_a")
+    assert set(repo.image_ids(scene="scene_a")) == {img_id, other_id}
+
+    repo.add_scene(img_id, "scene_b")
+
+    assert set(repo.image_ids(scene="scene_a")) == {other_id}
+    assert set(repo.image_ids(scene="scene_b")) == {img_id}
+
+
+def test_image_ids_filters_by_scene(repo):
+    id_a = repo.add_image("a.jpg", scene="scene_a")
+    id_b = repo.add_image("b.jpg", scene="scene_a")
+    id_c = repo.add_image("c.jpg", scene="scene_b")
+    id_default = repo.add_image("d.jpg")
+
+    assert set(repo.image_ids(scene="scene_a")) == {id_a, id_b}
+    assert set(repo.image_ids(scene="scene_b")) == {id_c}
+    assert set(repo.image_ids(scene=DEFAULT_SCENE)) == {id_default}
+    assert set(repo.image_ids()) == {id_a, id_b, id_c, id_default}
+
+
+def test_image_ids_scene_with_no_matches_is_empty(repo):
+    repo.add_image("a.jpg")
+    assert list(repo.image_ids(scene="unknown_scene")) == []
+
+
+def test_get_pairs_filters_by_scene(repo):
+    id_a = repo.add_image("a.jpg", scene="scene_a")
+    id_b = repo.add_image("b.jpg", scene="scene_a")
+    id_c = repo.add_image("c.jpg", scene="scene_b")
+    id_d = repo.add_image("d.jpg", scene="scene_b")
+
+    repo.add_pairs([(id_a, id_b), (id_c, id_d)])
+
+    assert {tuple(p) for p in repo.get_pairs(scene="scene_a")} == {(id_a, id_b)}
+    assert {tuple(p) for p in repo.get_pairs(scene="scene_b")} == {(id_c, id_d)}
+    assert {tuple(p) for p in repo.get_pairs()} == {(id_a, id_b), (id_c, id_d)}
+
+
+def test_get_pairs_unknown_scene_is_empty(repo):
+    id_a = repo.add_image("a.jpg", scene="scene_a")
+    id_b = repo.add_image("b.jpg", scene="scene_a")
+    repo.add_pairs([(id_a, id_b)])
+    assert repo.get_pairs(scene="scene_b") == []
+
+
+def test_add_pairs_raises_when_pair_spans_two_scenes(repo):
+    id_a = repo.add_image("a.jpg", scene="scene_a")
+    id_b = repo.add_image("b.jpg", scene="scene_b")
+    with pytest.raises(RepositoryException):
+        repo.add_pairs([(id_a, id_b)])
