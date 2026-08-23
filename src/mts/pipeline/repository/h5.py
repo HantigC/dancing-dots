@@ -291,7 +291,7 @@ class H5ImageRepository(BaseImageRepository):
             if metadata_grp is None:
                 LOGGER.debug("No metadata found for image %s", image_id)
                 return {}
-            return {json.loads(metadata_grp[k]) for k in args}
+            return {json.loads(metadata_grp.attrs[k]) for k in args}
 
     def add_pose(self, image_id: int, pose: Rigid3D) -> None:
         with self:

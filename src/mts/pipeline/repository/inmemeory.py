@@ -248,6 +248,10 @@ class ImageRepository(BaseImageRepository):
     def get_stored_pairs(self, name: str) -> list[PairType[ImageId]]:
         return list(self._pair_store.get(name, {}).keys())
 
+    def delete_repo(self) -> None:
+        """Clears all in-memory state. Nothing persistent to remove on disk."""
+        self.__init__()
+
     def open(self) -> None:
         pass
 
