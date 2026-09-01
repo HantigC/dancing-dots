@@ -5,14 +5,14 @@ from typing import Any
 from mts.core.pair.cross import compute_knn_pairs
 from mts.core.scene_graph.nx import mst_pair_distanced_triple
 from mts.core.types import ImageId, PairType
-from mts.pipeline.repository.base import BaseImageRepository
-from mts.pipeline.step.base import BasePipelineStep
+from mts.pipeline.repository.base import BaseImageRepository, SceneScopedImageRepository
+from mts.pipeline.step.base import PerSceneStep
 from mts.pipeline.step.pair.common import extract_possible_pairs
 
 LOGGER = logging.getLogger(__name__)
 
 
-class KnnEmbeddingParerStep(BasePipelineStep):
+class KnnEmbeddingParerStep(PerSceneStep):
     def __init__(
         self,
         min_images: int = 20,
@@ -30,12 +30,14 @@ class KnnEmbeddingParerStep(BasePipelineStep):
         self.max_pairs_per_image = max_pairs_per_image
         self.max_pairs = max_pairs
 
-    def run(
+    def run_scene(
         self,
         *,
-        image_repository: BaseImageRepository,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
         input: Any = None,
-        state: dict[str, Any] = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
     ) -> None:
         LOGGER.info("Compute pairs...")
         image_ids = list(image_repository.image_ids())
@@ -43,7 +45,7 @@ class KnnEmbeddingParerStep(BasePipelineStep):
         if len(image_ids) < self.min_images:
             pairs = list(it.combinations(image_ids, 2))
             image_repository.add_pairs(pairs)
-            state["starting_pairs"] = pairs
+            scene_state["starting_pairs"] = pairs
             return
 
         image_embeddings = [
@@ -68,7 +70,7 @@ class KnnEmbeddingParerStep(BasePipelineStep):
             tuple(sorted((st, nd))) for st, nd in mst.edges
         ]
         LOGGER.info("MST starting pairs: %d", len(mst_pairs))
-        state["starting_pairs"] = mst_pairs
+        scene_state["starting_pairs"] = mst_pairs
 
         LOGGER.info("Add starting pairs to state...")
         image_repository.store("starting_pairs", mst_pairs)

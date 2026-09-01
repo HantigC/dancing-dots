@@ -23,8 +23,8 @@ from mts.core.scene_graph.model import Image, MatchKind, TwoViewEdge
 from mts.core.scene_graph.nx import extract_matches
 from mts.core.types import ImageId, Pairs, PairType, PathLike
 from mts.helpers.torch.tensor import to
-from mts.pipeline.repository.base import BaseImageRepository
-from mts.pipeline.step.base import BasePipelineStep
+from mts.pipeline.repository.base import BaseImageRepository, SceneScopedImageRepository
+from mts.pipeline.step.base import PerSceneStep
 
 LOGGER = logging.getLogger(__name__)
 GrowCallable = Callable[
@@ -101,7 +101,7 @@ EncodedImageMap = dict[ImageId, EncodedImageDict]
 ImageShapesMap = dict[ImageId, torch.Tensor]
 
 
-class Mast3rMatchPipelineStep(BasePipelineStep):
+class Mast3rMatchPipelineStep(PerSceneStep):
     def __init__(
         self,
         mast3r_two_step: Mast3rTwoStep,
@@ -127,14 +127,16 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         self.subsample = subsample
         self.prune_connections = prune_connections
 
-    def run(
+    def run_scene(
         self,
         *,
-        image_repository: BaseImageRepository,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
         input: Any = None,
-        state: dict[str, Any] = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
     ) -> Any:
-        starting_pairs: list[PairType[ImageId]] = state["starting_pairs"]
+        starting_pairs: list[PairType[ImageId]] = scene_state["starting_pairs"]
         keypoints_map, matches_map, match_kind_map = self._compute_matches(
             image_repository,
             starting_pairs,

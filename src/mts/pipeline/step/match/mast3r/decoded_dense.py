@@ -16,8 +16,8 @@ from mts.core.scene_graph.nx import extract_matches
 from mts.core.types import ImageId
 from mts.helpers.torch.tensor import from_np
 from mts.helpers.torch.tensor import to as to_device
-from mts.pipeline.repository.base import BaseImageRepository
-from mts.pipeline.step.base import BasePipelineStep
+from mts.pipeline.repository.base import BaseImageRepository, SceneScopedImageRepository
+from mts.pipeline.step.base import PerSceneStep
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ GrowCallable = Callable[
 PruneCallable = Callable[[nx.Graph], nx.Graph]
 
 
-class Mast3rDecodedDenseMatchPipelineStep(BasePipelineStep):
+class Mast3rDecodedDenseMatchPipelineStep(PerSceneStep):
     """Builds a scene graph purely from MASt3R pair decodings that
     `Mast3rEncodeDecodeStep` already persisted to the image repository --
     it never runs the MASt3R model itself. It grows the graph over every
@@ -74,12 +74,14 @@ class Mast3rDecodedDenseMatchPipelineStep(BasePipelineStep):
             self._device = torch.device(device)
         return super().to(device, *args, **kwargs)
 
-    def run(
+    def run_scene(
         self,
         *,
-        image_repository: BaseImageRepository,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
         input: Any = None,
-        state: dict[str, Any] = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
     ) -> Any:
         keypoints_map, matches_map, match_kind_map = self._compute_matches(
             image_repository,

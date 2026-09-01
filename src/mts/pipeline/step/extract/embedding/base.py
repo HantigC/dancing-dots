@@ -1,13 +1,15 @@
 import torch
 import tqdm
+from typing import Any
 
 from mts.core.embedder.base import BaseEmbedder
+from mts.pipeline.repository.base import SceneScopedImageRepository
 from mts.pipeline.repository.inmemeory import ImageRepository
-from mts.pipeline.step.base import BasePipelineStep, use_image_repository
+from mts.pipeline.step.base import PerSceneStep
 from mts.utils.torchx import resize_if_larger, to_torch_format
 
 
-class GlobalDescriptorStep(BasePipelineStep):
+class GlobalDescriptorStep(PerSceneStep):
     def __init__(
         self,
         global_extractor: BaseEmbedder[torch.Tensor, torch.Tensor],
@@ -45,6 +47,13 @@ class GlobalDescriptorStep(BasePipelineStep):
 
                 image_repository.add_global_descriptor(image_index, global_descriptor)
 
-    @use_image_repository
-    def run(self, image_repository: ImageRepository) -> None:
+    def run_scene(
+        self,
+        *,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
+        input: Any = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
+    ) -> None:
         self._extract(image_repository)

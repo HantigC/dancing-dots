@@ -1,14 +1,15 @@
 import logging
 from pathlib import Path
+from typing import Any
 
 from mts.core.types import PathLike, PairType
-from mts.pipeline.repository.base import BaseImageRepository
-from mts.pipeline.step.base import BasePipelineStep, use_image_repository
+from mts.pipeline.repository.base import BaseImageRepository, SceneScopedImageRepository
+from mts.pipeline.step.base import PerSceneStep
 
 LOGGER = logging.getLogger(__name__)
 
 
-class LoadPairsFromTxtStep(BasePipelineStep):
+class LoadPairsFromTxtStep(PerSceneStep):
     """Load image pairs from a plain-text file and add them to the repository.
 
     File format: one pair per line, two filenames separated by whitespace.
@@ -19,8 +20,15 @@ class LoadPairsFromTxtStep(BasePipelineStep):
         super().__init__()
         self._filepath = Path(filepath)
 
-    @use_image_repository
-    def run(self, image_repository: BaseImageRepository) -> None:
+    def run_scene(
+        self,
+        *,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
+        input: Any = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
+    ) -> None:
         pairs = self._load(image_repository)
         LOGGER.info("Loaded %d pairs from '%s'", len(pairs), self._filepath)
         image_repository.add_pairs(pairs)
@@ -71,23 +79,28 @@ class LoadPairsFromTxtStep(BasePipelineStep):
         return pairs
 
 
-class SavePairsToTxtStep(BasePipelineStep):
+class SavePairsToTxtStep(PerSceneStep):
     """Write the repository's current pairs to a per-dataset txt file.
 
-    The output file is written to `dirpath/<dataset_name>.txt` where
-    `dataset_name` is read from repository metadata.  Each line contains
-    two space-separated image basenames.
+    The output file is written to `dirpath/<scene>.txt`, one file per
+    scene.  Each line contains two space-separated image basenames.
     """
 
     def __init__(self, dirpath: PathLike) -> None:
         super().__init__()
         self._dirpath = Path(dirpath)
 
-    @use_image_repository
-    def run(self, image_repository: BaseImageRepository) -> None:
-        dataset_name = image_repository.get_repository_metadata("dataset_name") or "pairs"
+    def run_scene(
+        self,
+        *,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
+        input: Any = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
+    ) -> None:
         self._dirpath.mkdir(parents=True, exist_ok=True)
-        dest = self._dirpath / f"{dataset_name}.txt"
+        dest = self._dirpath / f"{scene}.txt"
 
         pairs = image_repository.get_pairs()
         with open(dest, "w") as fh:

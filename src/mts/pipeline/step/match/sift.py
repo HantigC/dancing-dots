@@ -5,14 +5,14 @@ import cv2
 import numpy as np
 from tqdm.auto import tqdm
 
-from mts.pipeline.repository.base import BaseImageRepository
-from mts.pipeline.step.base import BasePipelineStep
+from mts.pipeline.repository.base import BaseImageRepository, SceneScopedImageRepository
+from mts.pipeline.step.base import PerSceneStep
 from mts.pipeline.step.pair.sift import extract_sift_features, match_descriptors
 
 LOGGER = logging.getLogger(__name__)
 
 
-class SiftKeypointMatchStep(BasePipelineStep):
+class SiftKeypointMatchStep(PerSceneStep):
     def __init__(
         self,
         num_features: int = 2048,
@@ -26,12 +26,14 @@ class SiftKeypointMatchStep(BasePipelineStep):
         self.min_matches = min_matches
         self.reuse = reuse
 
-    def run(
+    def run_scene(
         self,
         *,
-        image_repository: BaseImageRepository,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
         input: Any = None,
-        state: dict[str, Any] = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
     ) -> Any:
         self._extract_keypoints(image_repository)
         self._match_pairs(image_repository)

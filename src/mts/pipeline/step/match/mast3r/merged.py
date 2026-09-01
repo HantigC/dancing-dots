@@ -16,8 +16,8 @@ from mts.core.model.mast3r.io import load_model
 from mts.core.scene_graph.model import Image, MatchKind, TwoViewEdge
 from mts.core.scene_graph.nx import extract_matches
 from mts.core.types import ImageId, PairType, PathLike
-from mts.pipeline.repository.base import BaseImageRepository
-from mts.pipeline.step.extract.kp.base import BasePipelineStep
+from mts.pipeline.repository.base import BaseImageRepository, SceneScopedImageRepository
+from mts.pipeline.step.base import PerSceneStep
 
 LOGGER = logging.getLogger(__name__)
 GrowCallable = Callable[
@@ -37,7 +37,7 @@ PruneCallable = Callable[
 ]
 
 
-class Mast3rMatchPipelineStep(BasePipelineStep):
+class Mast3rMatchPipelineStep(PerSceneStep):
     def __init__(
         self,
         mast3r_model: AsymmetricMASt3R,
@@ -62,14 +62,16 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         self.pixel_tol = pixel_tol
         self.top_k_matches = top_k_matches
 
-    def run(
+    def run_scene(
         self,
         *,
-        image_repository: BaseImageRepository,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
         input: Any = None,
-        state: dict[str, Any] = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
     ) -> Any:
-        starting_pairs: list[PairType[ImageId]] = state["starting_pairs"]
+        starting_pairs: list[PairType[ImageId]] = scene_state["starting_pairs"]
         keypoints_map, matches_map, match_kind_map = self._compute_matches(
             image_repository,
             starting_pairs,

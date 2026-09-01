@@ -10,9 +10,9 @@ from mts.core.geometry.rigid3d import Rigid3D
 from mts.core.types import StateType
 from mts.helpers.colmap.database import COLMAPDatabase
 from mts.helpers.colmap.h5_to_db import CameraModel
-from mts.pipeline.repository.base import AlreadyExistsException, BaseImageRepository
+from mts.pipeline.repository.base import AlreadyExistsException, BaseImageRepository, SceneScopedImageRepository
 from mts.pipeline.repository.export.colmap import export_to_colmap
-from mts.pipeline.step.base import BasePipelineStep, use_image_repository
+from mts.pipeline.step.base import PerSceneStep
 
 LOGGER = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ def save_sorted_to_repository(
                 )
 
 
-class BaseColmapReconstructionStep(BasePipelineStep, ABC):
+class BaseColmapReconstructionStep(PerSceneStep, ABC):
     def __init__(
         self,
         save_to_repository: SaveToRepoCallable | None = None,
@@ -107,14 +107,17 @@ class BaseColmapReconstructionStep(BasePipelineStep, ABC):
             save_to_repository = save_sorted_to_repository
         self._save_to_repository = save_to_repository
 
-    @use_image_repository(params=["state"])
-    def run(
+    def run_scene(
         self,
         *,
-        image_repository: BaseImageRepository,
-        state: StateType,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
+        input: Any = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
     ) -> None:
-        colmap_dirpath = Path(state["colmap_dirpath"])
+        colmap_dirpath = Path(state["colmap_dirpath"]) / scene
+        colmap_dirpath.mkdir(parents=True, exist_ok=True)
         colmap_db_filepath = colmap_dirpath / "colmap.db"
         if not colmap_db_filepath.exists():
             db = export_to_colmap(
@@ -128,11 +131,12 @@ class BaseColmapReconstructionStep(BasePipelineStep, ABC):
             )
         else:
             db = COLMAPDatabase.connect(colmap_db_filepath)
+        local_state = {**state, "colmap_dirpath": colmap_dirpath}
         maps = self._run_colmap(
             image_repository=image_repository,
             input=input,
             db=db,
-            state=state,
+            state=local_state,
         )
         self._save_to_repository(maps, image_repository)
 

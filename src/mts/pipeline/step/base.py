@@ -10,6 +10,7 @@ from torch import nn
 
 from mts.core.types import PathLike, StateType
 from mts.helpers.torch.nn import DeviceMixin
+from mts.pipeline.repository.base import SceneScopedImageRepository
 from mts.pipeline.repository.inmemeory import ImageRepository
 
 LOGGER = logging.getLogger(__name__)
@@ -72,6 +73,74 @@ class OnDeviceRunner(BasePipelineStep):
         )
         self.step.to(prev_device)
         return result
+
+
+class PerSceneStep(BasePipelineStep):
+    """A pipeline step that runs once per scene in the repository.
+
+    ``run`` iterates ``image_repository.scenes()`` (deterministic order) and
+    calls the subclass' ``run_scene`` once per scene. Per-scene exceptions
+    are logged and skipped so one bad scene does not abort the rest of the
+    run (this mirrors the old per-dataset isolation in
+    ``IMC2025Pipeline.run``). ``run`` returns ``{scene: run_scene_result}``.
+
+    ``run_scene`` receives a :class:`SceneScopedImageRepository` as its
+    ``image_repository`` -- image enumeration, pairs and ``store``/``load``
+    are already scoped to ``scene`` -- so step bodies can stay
+    scene-agnostic. The unscoped repository is reachable via
+    ``image_repository.unscoped`` if ever needed.
+
+    Per-scene scratch state lives at ``state["scenes"][scene]`` and is
+    passed to ``run_scene`` as ``scene_state``; the shared ``state`` (with
+    ``colmap_dirpath`` / ``images_dir``) is passed as ``state`` as well.
+
+    When wrapped in ``OnDeviceRunner`` the inner step is moved to the target
+    device once, around the whole scene loop -- model load is the expensive
+    part, so this is intentional.
+    """
+
+    def run(
+        self,
+        *,
+        image_repository: ImageRepository,
+        input: Any = None,
+        state: StateType | None = None,
+    ) -> dict[str, Any]:
+        state = state if state is not None else {}
+        scenes_state = state.setdefault("scenes", {})
+        results: dict[str, Any] = {}
+        for scene in image_repository.scenes():
+            scene_state = scenes_state.setdefault(scene, {})
+            LOGGER.info("Step '%s' -- scene '%s'", self.name(), scene)
+            try:
+                results[scene] = self.run_scene(
+                    image_repository=SceneScopedImageRepository(
+                        image_repository, scene
+                    ),
+                    scene=scene,
+                    input=input,
+                    state=state,
+                    scene_state=scene_state,
+                )
+            except Exception:
+                LOGGER.exception(
+                    "Step '%s' failed for scene '%s', skipping",
+                    self.name(),
+                    scene,
+                )
+        return results
+
+    @abstractmethod
+    def run_scene(
+        self,
+        *,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
+        input: Any = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
+    ) -> Any:
+        pass
 
 
 def use_image_repository(

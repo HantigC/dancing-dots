@@ -1,16 +1,18 @@
 import itertools as it
 import logging
+from typing import Any
 
 from mts.core.pair.cross import compute_cross_pairs
 from mts.core.types import ImageId, PairType
+from mts.pipeline.repository.base import BaseImageRepository, SceneScopedImageRepository
 from mts.pipeline.repository.inmemeory import ImageRepository
-from mts.pipeline.step.base import BasePipelineStep, use_image_repository
+from mts.pipeline.step.base import PerSceneStep
 from mts.pipeline.step.pair.common import extract_possible_pairs
 
 LOGGER = logging.getLogger(__name__)
 
 
-class CrossEmbeddingParerStep(BasePipelineStep):
+class CrossEmbeddingParerStep(PerSceneStep):
     def __init__(
         self,
         min_images: int = 20,
@@ -28,19 +30,28 @@ class CrossEmbeddingParerStep(BasePipelineStep):
         self.max_pairs_per_image = max_pairs_per_image
         self.max_pairs = max_pairs
 
-    @use_image_repository
-    def run(self, image_repository: ImageRepository) -> None:
-        LOGGER.info("Compute pairs...")
-        pairs = self._compute_pairs(image_repository)
-        LOGGER.info("Computed %d pairs...", len(pairs))
+    def run_scene(
+        self,
+        *,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
+        input: Any = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
+    ) -> None:
+        LOGGER.info("Compute pairs for scene '%s'...", scene)
+        pairs = self._compute_pairs(image_repository, scene)
+        LOGGER.info("Computed %d pairs for scene '%s'", len(pairs), scene)
+        # every pair is within `scene`; add_pairs raises if that is ever
+        # violated, so cross-scene pairs can never be persisted here.
         image_repository.add_pairs(pairs)
 
     def _compute_pairs(
-        self, image_repository: ImageRepository
+        self, image_repository: BaseImageRepository, scene: str
     ) -> list[PairType[ImageId]]:
-        if image_repository.images_num() < self.min_images:
-            return list(it.combinations(image_repository.image_ids(), 2))
-        image_ids = list(image_repository.image_ids())
+        image_ids = list(image_repository.image_ids(scene=scene))
+        if len(image_ids) < self.min_images:
+            return list(it.combinations(image_ids, 2))
         image_embeddings = [
             image_repository.get_global_descriptor(
                 image_id,

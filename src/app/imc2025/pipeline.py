@@ -6,14 +6,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-from tqdm.auto import tqdm
 
 from mts.core.types import PathLike, StateType
 from mts.pipeline.repository import h5 as h5_repo
 from mts.pipeline.repository import inmemeory as mem_repo
 from mts.pipeline.repository.base import BaseImageRepository
-from mts.pipeline.step.base import from_hydra_config, run_pipeline
-from mts.pipeline.step.extract.kp.base import BasePipelineStep
+from mts.pipeline.step.base import (
+    BasePipelineStep,
+    from_hydra_config,
+    run_pipeline,
+)
 
 from .prediction import Prediction
 
@@ -27,13 +29,13 @@ ALL = "all"
 class IMC2025Pipeline:
     project_dirpath: PathLike
     samples: dict[str, list[Prediction]]
-    create_repository: Callable[[str, IMC2025Pipeline], BaseImageRepository]
-    create_pipeline: Callable[[str, BaseImageRepository], BasePipelineStep]
+    create_repository: Callable[[IMC2025Pipeline], BaseImageRepository]
+    create_pipeline: Callable[[Any, BaseImageRepository], list[BasePipelineStep]]
     create_pipeline_input: (
-        Callable[[IMC2025Pipeline, BaseImageRepository, str], Any] | None
+        Callable[[IMC2025Pipeline, BaseImageRepository], Any] | None
     ) = field(default=None)
     create_pipeline_state: (
-        Callable[[IMC2025Pipeline, BaseImageRepository, str], StateType] | None
+        Callable[[IMC2025Pipeline, BaseImageRepository], StateType] | None
     ) = field(default=None)
     delete_repo: bool = field(default=False)
     _last_cluster_index: int = field(default=0)
@@ -54,97 +56,68 @@ class IMC2025Pipeline:
     ):
         datasets_names = self._get_dataset_names(datasets_names)
         t0 = time.monotonic()
-        for num, dataset_name in enumerate(datasets_names, 1):
-            LOGGER.info(
-                "=" * 80,
-            )
-            LOGGER.info(
-                "*" * 80,
-            )
-            LOGGER.info(
-                "Started running for '%s' dataset: [%d/%d]",
-                dataset_name,
-                num,
-                len(datasets_names),
-            )
-            LOGGER.info(
-                "=" * 80,
-            )
-            try:
-                self.run_for(dataset_name)
-            except Exception:
-                LOGGER.exception(
-                    "Something happened for dataset '%s', skipping", dataset_name
+
+        image_repository = self.create_repository(self)
+        with image_repository:
+            for dataset_name in datasets_names:
+                self._repositories_map[dataset_name] = image_repository
+            pipeline = self.create_pipeline(image_repository)
+
+            for dataset_name in datasets_names:
+                dataset_samples = self.samples[dataset_name]
+                LOGGER.info(
+                    "Adding %d images for scene '%s'",
+                    len(dataset_samples),
+                    dataset_name,
+                )
+                image_repository.add_images(
+                    [str(sample.image_filepath) for sample in dataset_samples],
+                    scene=dataset_name,
                 )
 
-            LOGGER.info(
-                "*" * 80,
-            )
-            LOGGER.info(
-                "Ended running for '%s' dataset: [%d/%d]",
-                dataset_name,
-                num,
-                len(datasets_names),
-            )
-            LOGGER.info(
-                "=" * 80,
-            )
+            input = None
+            if self.create_pipeline_input is not None:
+                input = self.create_pipeline_input(self, image_repository)
+
+            state = {}
+            if self.create_pipeline_state is not None:
+                state = self.create_pipeline_state(self, image_repository)
+
+            LOGGER.info("Starting the pipeline for %d scene(s)", len(datasets_names))
+            try:
+                run_pipeline(
+                    pipeline,
+                    image_repository=image_repository,
+                    input=input,
+                    state=state,
+                )
+            except Exception:
+                LOGGER.exception(
+                    "Pipeline aborted; collecting whatever completed so far"
+                )
+
+            for dataset_name in datasets_names:
+                self._collect(image_repository, dataset_name)
+
+        if self.delete_repo:
+            image_repository.delete_repo()
 
         elapsed = time.monotonic() - t0
         LOGGER.info(
             "Pipeline finished in %.2f seconds (%.2f minutes)", elapsed, elapsed / 60
         )
 
-    def run_for(self, dataset_name: str) -> None:
-        dataset_samples = self.samples[dataset_name]
-        t0 = time.monotonic()
-
-        image_repository = self.create_repository(dataset_name, self)
-        with image_repository:
-            self._repositories_map[dataset_name] = image_repository
-            pipeline = self.create_pipeline(dataset_name, image_repository)
-
-            LOGGER.info("Add `%s` to image_repository", dataset_name)
-            for sample in tqdm(dataset_samples, desc="Add images to repository"):
-                image_repository.add_image(sample.image_filepath)
-            LOGGER.info("Starting the pipeline for `%s`", dataset_name)
-
-            input = None
-            if self.create_pipeline_input is not None:
-                input = self.create_pipeline_input(self, image_repository, dataset_name)
-
-            state = {}
-            if self.create_pipeline_state is not None:
-                state = self.create_pipeline_state(self, image_repository, dataset_name)
-
-            run_pipeline(
-                pipeline,
-                image_repository=image_repository,
-                input=input,
-                state=state,
-            )
-            self._collect(image_repository, dataset_samples)
-
-        if self.delete_repo:
-            image_repository.delete_repo()
-        elapsed = time.monotonic() - t0
-        LOGGER.info(
-            "`%s` finished in %.2f seconds (%.2f minutes)",
-            dataset_name,
-            elapsed,
-            elapsed / 60,
-        )
-
     def _collect(
         self,
         repository: BaseImageRepository,
-        dataset_samples: list[Prediction],
+        dataset_name: str,
     ) -> None:
+        dataset_samples = self.samples[dataset_name]
         filename_to_prediction = {
             str(prediction.image_filepath): prediction for prediction in dataset_samples
         }
         how_many_clusters = 0
-        for image_id in repository.image_ids():
+        for image_id in repository.image_ids(scene=dataset_name):
             metadata: dict[str, str] | None = repository.get_metadata(image_id)
             cluster_index = None
             if metadata is not None:
@@ -161,35 +134,46 @@ class IMC2025Pipeline:
         self._last_cluster_index += how_many_clusters + 1
 
 
+def _repository_filename(imc2025_pipeline: IMC2025Pipeline) -> str:
+    """One shared file for a normal multi-scene run; a per-dataset file when
+    the pipeline was handed exactly one dataset (the distributed worker
+    path), so concurrent workers sharing an iteration dir don't collide."""
+    samples = imc2025_pipeline.samples
+    if len(samples) == 1:
+        return f"{next(iter(samples))}.h5"
+    return "repository.h5"
+
+
 def create_inmemory_repository(
-    dataset_name: str,
     imc2025_pipeline: IMC2025Pipeline,
 ) -> mem_repo.ImageRepository:
     image_repository = mem_repo.ImageRepository()
-    image_repository.add_repository_metadata(dataset_name=dataset_name)
+    image_repository.upsert_repository_metadata(
+        dataset_names=list(imc2025_pipeline.samples)
+    )
     return image_repository
 
 
 def create_h5_repository(
-    dataset_name: str,
     imc2025_pipeline: IMC2025Pipeline,
     delete_on_exit: bool = False,
 ) -> h5_repo.H5ImageRepository:
-    dataset_filepath = imc2025_pipeline.project_dirpath / "h5_repositories"
-    dataset_filepath.mkdir(exist_ok=True)
+    h5_dirpath = Path(imc2025_pipeline.project_dirpath) / "h5_repositories"
+    h5_dirpath.mkdir(parents=True, exist_ok=True)
     image_repository = h5_repo.H5ImageRepository.from_filename(
-        dataset_filepath,
-        f"{dataset_name}.h5",
+        h5_dirpath,
+        _repository_filename(imc2025_pipeline),
         delete_on_exit=delete_on_exit,
     )
-    image_repository.add_repository_metadata(dataset_name=dataset_name)
+    image_repository.upsert_repository_metadata(
+        dataset_names=list(imc2025_pipeline.samples)
+    )
     return image_repository
 
 
 def create_pipeline(
     cfg,
     image_repository: BaseImageRepository,
-    dataset_name: str,
 ) -> list[BasePipelineStep]:
     pipeline_steps = from_hydra_config(cfg)
     return pipeline_steps
@@ -198,12 +182,11 @@ def create_pipeline(
 def create_pipeline_state(
     imc2025_pipeline: IMC2025Pipeline,
     image_repository: BaseImageRepository,
-    dataset_name: str,
 ) -> StateType:
-    dataset_dirpath = Path(imc2025_pipeline.project_dirpath) / dataset_name
-    dataset_dirpath.mkdir(exist_ok=True)
+    project_dirpath = Path(imc2025_pipeline.project_dirpath)
+    project_dirpath.mkdir(parents=True, exist_ok=True)
     state = {
         "images_dir": ".",
-        "colmap_dirpath": dataset_dirpath,
+        "colmap_dirpath": project_dirpath,
     }
     return state

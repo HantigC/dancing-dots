@@ -10,6 +10,15 @@ from mts.core.types import ImageId, PairType
 DEFAULT_SCENE = "base"
 
 
+def scene_key(name: str, scene: str) -> str:
+    """Namespaces a repository ``store``/``load`` blob key by scene.
+
+    Uses ``__`` rather than ``/`` as the separator because some backends
+    (e.g. HDF5) treat ``/`` in a key as a nested path.
+    """
+    return f"{name}__{scene}"
+
+
 class BaseImageRepository(ABC):
     """Abstract base class for image repositories.
 
@@ -111,6 +120,21 @@ class BaseImageRepository(ABC):
             The scene name, or None if the image has no scene assigned.
         """
         pass
+
+    def scenes(self) -> list[str]:
+        """Returns the sorted names of scenes that currently hold at least
+        one image.
+
+        ``DEFAULT_SCENE`` ("base") only appears when an image was actually
+        assigned to it. An empty repository returns ``[]``. Backends may
+        override this with a cheaper implementation.
+        """
+        seen: set[str] = set()
+        for image_id in self.image_ids():
+            scene = self.get_scene(image_id)
+            if scene is not None:
+                seen.add(scene)
+        return sorted(seen)
 
     @abstractmethod
     def image_ids(self, scene: str | None = None) -> Generator[ImageId, None, None]:
@@ -603,3 +627,115 @@ class NotFoundException(RepositoryException):
 
 class AlreadyExistsException(RepositoryException):
     """Raised in case an item already exists inside the repository"""
+
+
+class SceneScopedImageRepository:
+    """A per-scene view over a :class:`BaseImageRepository`.
+
+    Image enumeration (``image_ids``, ``image_filepaths``,
+    ``iterate_over_images``, ``images_num``), pairs (``get_pairs``,
+    ``pair_num``, ``get_stored_pairs``), scene listing (``scenes``) and
+    named blob storage (``store``/``load``) are transparently scoped to a
+    single scene. Image insertion (``add_image``/``add_images``) is forced
+    into that scene. Every other call -- anything keyed by a
+    globally-unique image id or image-id pair (keypoints, descriptors,
+    matches, poses, per-image/per-pair metadata, ``store_pair`` ...) --
+    is delegated unchanged to the wrapped repository.
+
+    Pipeline steps built on :class:`PerSceneStep` receive one of these as
+    their ``image_repository`` so their bodies can stay scene-agnostic.
+    """
+
+    def __init__(self, repository: "BaseImageRepository", scene: str) -> None:
+        self._repository = repository
+        self._scene = scene
+
+    @property
+    def scene(self) -> str:
+        return self._scene
+
+    @property
+    def unscoped(self) -> "BaseImageRepository":
+        """The wrapped repository, spanning every scene."""
+        return self._repository
+
+    # -- scene enumeration ------------------------------------------------
+
+    def scenes(self) -> list[str]:
+        return [self._scene]
+
+    def get_scene(self, image_id: ImageId) -> str | None:
+        return self._repository.get_scene(image_id)
+
+    # -- image enumeration (scoped) -------------------------------------
+
+    def image_ids(self, scene: str | None = None) -> Generator[ImageId, None, None]:
+        yield from self._repository.image_ids(scene=self._scene)
+
+    def image_filepaths(self) -> Generator[Path, None, None]:
+        for image_id in self._repository.image_ids(scene=self._scene):
+            yield Path(self._repository.get_filepath(image_id))
+
+    def iterate_over_images(self) -> Generator[Tuple[ImageId, np.ndarray], None, None]:
+        for image_id in self._repository.image_ids(scene=self._scene):
+            yield image_id, self._repository.load_image(image_id)
+
+    def images_num(self) -> int:
+        return sum(1 for _ in self._repository.image_ids(scene=self._scene))
+
+    # -- image insertion (forced into this scene) ---------------------
+
+    def add_image(self, filepath: str, scene: str | None = None) -> ImageId:
+        return self._repository.add_image(filepath, scene=self._scene)
+
+    def add_images(
+        self, filepaths: list[str], scene: str | None = None
+    ) -> list[ImageId]:
+        return self._repository.add_images(filepaths, scene=self._scene)
+
+    def add_scene(self, image_id: ImageId, scene: str) -> None:
+        self._repository.add_scene(image_id, scene)
+
+    # -- pairs (scoped) ------------------------------------------------
+
+    def get_pairs(self, scene: str | None = None) -> list[PairType]:
+        return self._repository.get_pairs(scene=self._scene)
+
+    def pair_num(self) -> int:
+        return len(self._repository.get_pairs(scene=self._scene))
+
+    def get_stored_pairs(self, name: str) -> list[PairType[ImageId]]:
+        scene_ids = set(self._repository.image_ids(scene=self._scene))
+        return [
+            (a, b)
+            for a, b in self._repository.get_stored_pairs(name)
+            if a in scene_ids and b in scene_ids
+        ]
+
+    # -- named blob storage (scene-namespaced) -----------------------
+
+    def store(self, name: str, data: Any) -> None:
+        self._repository.store(scene_key(name, self._scene), data)
+
+    def load(self, name: str) -> Any:
+        return self._repository.load(scene_key(name, self._scene))
+
+    # -- everything else ------------------------------------------------
+
+    def __getattr__(self, name: str) -> Any:
+        # only reached when the attribute is not defined above
+        return getattr(self._repository, name)
+
+    def __enter__(self) -> "SceneScopedImageRepository":
+        return self
+
+    def __exit__(self, *_) -> None:
+        # the wrapped repository's lifecycle is owned by the caller
+        return None
+
+
+# ``SceneScopedImageRepository`` delegates the full ``BaseImageRepository``
+# surface (via the explicit overrides above plus ``__getattr__``), so it is
+# registered as a virtual subclass: ``isinstance(scoped, BaseImageRepository)``
+# holds and type annotations of ``BaseImageRepository`` accept it.
+BaseImageRepository.register(SceneScopedImageRepository)

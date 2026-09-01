@@ -25,8 +25,8 @@ from mts.core.scene_graph.nx import extract_matches
 from mts.core.types import ImageId, PathLike
 from mts.helpers.torch.tensor import from_np, to_numpy
 from mts.helpers.torch.tensor import to as to_device
-from mts.pipeline.repository.base import BaseImageRepository
-from mts.pipeline.step.base import BasePipelineStep
+from mts.pipeline.repository.base import BaseImageRepository, SceneScopedImageRepository
+from mts.pipeline.step.base import PerSceneStep
 from mts.pipeline.step.match.mast3r.encode_decode import (
     DescriptorsGrid,
     extract_sparse_matches,
@@ -46,7 +46,7 @@ GrowCallable = Callable[
 PruneCallable = Callable[[nx.Graph], nx.Graph]
 
 
-class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
+class Mast3rDecodedMatchPipelineStep(PerSceneStep):
     """Builds a scene graph purely from MASt3R pair decodings that
     `Mast3rEncodeDecodeStep` already persisted to the image repository --
     it grows the graph over every pair `Mast3rEncodeDecodeStep` validated
@@ -127,23 +127,30 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
             **kwargs,
         )
 
-    def run(
+    def run_scene(
         self,
         *,
-        image_repository: BaseImageRepository,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
         input: Any = None,
-        state: dict[str, Any] = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
     ) -> Any:
-        self._prepare_encodings(image_repository)
-        keypoints_map, matches_map, match_kind_map = self._compute_matches(
-            image_repository,
-        )
-        self._save_matches_and_kpts(
-            keypoints_map,
-            matches_map,
-            match_kind_map,
-            image_repository,
-        )
+        try:
+            self._prepare_encodings(image_repository)
+            keypoints_map, matches_map, match_kind_map = self._compute_matches(
+                image_repository,
+            )
+            self._save_matches_and_kpts(
+                keypoints_map,
+                matches_map,
+                match_kind_map,
+                image_repository,
+            )
+        finally:
+            # cache is keyed by globally-unique image ids so it stays correct
+            # across scenes; clearing bounds memory over a many-scene run.
+            self._encoding_cache.clear()
 
     def _compute_matches(
         self,

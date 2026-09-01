@@ -96,7 +96,9 @@ def add_keypoints(
                 db.add_descriptors(image_id, descriptors)
         id_to_db_id[image_id] = db_image_id
 
-    image_repository.add_repository_metadata(
+    # upsert (not add): with a multi-scene repository this runs once per
+    # scene, so the key already exists after the first scene.
+    image_repository.upsert_repository_metadata(
         id_to_db_id=np.array(list(id_to_db_id.items()))
     )
 

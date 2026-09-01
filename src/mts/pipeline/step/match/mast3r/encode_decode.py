@@ -1,5 +1,5 @@
 import logging
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import numpy as np
 import torch
@@ -19,8 +19,8 @@ from mts.core.model.mast3r.io import load_model
 from mts.core.model.mast3r.transform import transform_keypoints_to_original
 from mts.core.types import ImageId, PathLike
 from mts.helpers.torch.tensor import to, to_numpy
-from mts.pipeline.repository.base import BaseImageRepository
-from mts.pipeline.step.base import BasePipelineStep, use_image_repository
+from mts.pipeline.repository.base import BaseImageRepository, SceneScopedImageRepository
+from mts.pipeline.step.base import PerSceneStep
 
 LOGGER = logging.getLogger(__name__)
 
@@ -244,7 +244,7 @@ def extract_sparse_matches(
     return st_matched_kpts, nd_matched_kpts
 
 
-class Mast3rEncodeDecodeStep(BasePipelineStep):
+class Mast3rEncodeDecodeStep(PerSceneStep):
     """Encodes every image and decodes every repository pair with MASt3R,
     persisting both to the image repository. Every encoding is persisted;
     a pair's decoding is only persisted if its two-view-validated sparse
@@ -274,8 +274,15 @@ class Mast3rEncodeDecodeStep(BasePipelineStep):
         self.store_pairs = store_pairs
         self.validated_pairs_name = validated_pairs_name
 
-    @use_image_repository
-    def run(self, image_repository: BaseImageRepository) -> None:
+    def run_scene(
+        self,
+        *,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
+        input: Any = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
+    ) -> None:
         LOGGER.info("Encoding all images with MASt3R...")
         encoded_map, shapes_map = self._encode_all_images(image_repository)
         pairs = image_repository.get_pairs()

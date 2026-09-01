@@ -1,17 +1,19 @@
 import gc
 import logging
+from typing import Any
 
 import torch
 from tqdm.auto import tqdm
 
 from mts.core.matching.base import BaseMatcher
+from mts.pipeline.repository.base import SceneScopedImageRepository
 from mts.pipeline.repository.inmemeory import ImageRepository
-from mts.pipeline.step.base import BasePipelineStep, use_image_repository
+from mts.pipeline.step.base import PerSceneStep
 
 LOGGER = logging.getLogger(__name__)
 
 
-class StreamedMatchingStep(BasePipelineStep):
+class StreamedMatchingStep(PerSceneStep):
     """MatchingStep that uses CUDA streams to overlap H2D transfers with GPU compute.
 
     Double-buffering pattern: while compute_stream runs the matcher on pair N,
@@ -45,9 +47,16 @@ class StreamedMatchingStep(BasePipelineStep):
     def _h2d(self, cpu_tensors, device):
         return tuple(t.to(device, non_blocking=True) for t in cpu_tensors)
 
-    @use_image_repository
     @torch.no_grad
-    def run(self, image_repository: ImageRepository) -> None:
+    def run_scene(
+        self,
+        *,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
+        input: Any = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
+    ) -> None:
         device = self.device
         device_type = device.type if hasattr(device, "type") else str(device).split(":")[0]
 

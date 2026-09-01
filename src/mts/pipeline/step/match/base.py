@@ -1,17 +1,18 @@
 import logging
 
 import torch
+from typing import Any
 from tqdm.auto import tqdm
 
 from mts.core.matching.base import BaseMatcher
-from mts.pipeline.repository.inmemeory import ImageRepository
-from mts.pipeline.step.base import BasePipelineStep, use_image_repository
+from mts.pipeline.repository.base import SceneScopedImageRepository
+from mts.pipeline.step.base import PerSceneStep
 import gc
 
 LOGGER = logging.getLogger(__name__)
 
 
-class MatchingStep(BasePipelineStep):
+class MatchingStep(PerSceneStep):
     def __init__(
         self,
         matcher: BaseMatcher,
@@ -27,9 +28,16 @@ class MatchingStep(BasePipelineStep):
         self.descriptors_name = descriptors_name
         self.matches_name = matches_name
 
-    @use_image_repository
     @torch.no_grad
-    def run(self, image_repository: ImageRepository) -> None:
+    def run_scene(
+        self,
+        *,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
+        input: Any = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
+    ) -> None:
         device = self.device
         with torch.inference_mode():
             for pair_idx in tqdm(

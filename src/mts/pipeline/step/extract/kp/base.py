@@ -1,13 +1,16 @@
+from typing import Any
+
 import torch
 from tqdm.auto import tqdm
 
 from mts.core.extractor.base import BaseExtractor
+from mts.pipeline.repository.base import SceneScopedImageRepository
 from mts.pipeline.repository.inmemeory import ImageRepository
-from mts.pipeline.step.base import BasePipelineStep, use_image_repository
+from mts.pipeline.step.base import PerSceneStep
 from mts.utils.torchx import to_torch_format
 
 
-class TorchExtractStep(BasePipelineStep):
+class TorchExtractStep(PerSceneStep):
     def __init__(
         self,
         extractor: BaseExtractor,
@@ -42,6 +45,13 @@ class TorchExtractStep(BasePipelineStep):
                 image_repository.add_keypoints(image_index, keypoints, name=self.keypoints_name)
                 image_repository.add_descriptors(image_index, descriptors, name=self.descriptors_name)
 
-    @use_image_repository
-    def run(self, image_repository: ImageRepository) -> None:
+    def run_scene(
+        self,
+        *,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
+        input: Any = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
+    ) -> None:
         self._extract(image_repository)

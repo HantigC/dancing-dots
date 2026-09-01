@@ -83,6 +83,9 @@ class ImageRepository(BaseImageRepository):
     def get_scene(self, image_id: ImageId) -> str | None:
         return self._image_scene.get(image_id)
 
+    def scenes(self) -> list[str]:
+        return sorted(set(self._image_scene.values()))
+
     def image_ids(self, scene: str | None = None) -> Generator[int, None, None]:
         for id in self._id_to_filepath:
             if scene is None or self._image_scene.get(id) == scene:

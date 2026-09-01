@@ -11,8 +11,8 @@ from mts.core.matching.utils.validation import validate_kps_matches
 from mts.core.pair.cross import compute_cross_pairs
 from mts.core.scene_graph.nx import mst_pair_distanced_triple
 from mts.core.types import DistancedTriple, ImageId, PairType, PathLike
-from mts.pipeline.repository.base import BaseImageRepository
-from mts.pipeline.step.base import BasePipelineStep
+from mts.pipeline.repository.base import BaseImageRepository, SceneScopedImageRepository
+from mts.pipeline.step.base import PerSceneStep
 from mts.pipeline.step.pair.common import extract_possible_pairs
 from mts.pipeline.step.pair.mast3r import MstPairTriple
 from mts.utils.torchx import to_torch_format
@@ -91,7 +91,7 @@ def filter_validated_paris(
     return filtered_pairs, validated_matches
 
 
-class SiftDistanceParer(BasePipelineStep):
+class SiftDistanceParer(PerSceneStep):
     def __init__(
         self,
         global_descriptor: BaseEmbedder,
@@ -119,12 +119,14 @@ class SiftDistanceParer(BasePipelineStep):
         self.save_descriptors = save_descriptors
         self.save_matches = save_matches
 
-    def run(
+    def run_scene(
         self,
         *,
-        image_repository: BaseImageRepository,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
         input: Any = None,
-        state: dict[str, Any] = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
     ) -> Any:
         LOGGER.info("Compute pairs...")
         pairs = self._compute_pairs(image_repository)
@@ -135,7 +137,7 @@ class SiftDistanceParer(BasePipelineStep):
         image_repository.store("starting_pairs", pairs.possible_pairs)
 
         LOGGER.info("Add starting pairs to state...")
-        state["starting_pairs"] = pairs.mst_pairs
+        scene_state["starting_pairs"] = pairs.mst_pairs
 
     def _extract_initial_triples(
         self,

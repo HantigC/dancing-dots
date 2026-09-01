@@ -300,6 +300,17 @@ class H5ImageRepository(BaseImageRepository):
     def get_scene(self, image_id: ImageId) -> str | None:
         return self._image_id_to_scene.get(int(image_id))
 
+    def scenes(self) -> list[str]:
+        with self._reading() as h5_read:
+            scenes_grp = h5_read.get("scenes")
+            if scenes_grp is None:
+                return []
+            return sorted(
+                name
+                for name in scenes_grp.keys()
+                if name != self._NO_SCENE_KEY and len(scenes_grp[name]) > 0
+            )
+
     def image_ids(self, scene: str | None = None) -> Generator[int, None, None]:
         if scene is None:
             with self._reading() as h5_read:

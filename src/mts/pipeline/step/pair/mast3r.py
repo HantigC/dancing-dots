@@ -11,15 +11,15 @@ from mast3r.retrieval.processor import Retriever
 from mts.core.model.mast3r.io import load_model
 from mts.core.scene_graph.nx import mst_from_distance_matrix
 from mts.core.types import PairType, PathLike
-from mts.pipeline.repository.base import BaseImageRepository
+from mts.pipeline.repository.base import BaseImageRepository, SceneScopedImageRepository
 from mts.pipeline.repository.inmemeory import ImageId, ImageRepository
-from mts.pipeline.step.base import BasePipelineStep, use_image_repository
+from mts.pipeline.step.base import PerSceneStep
 from mts.utils.pair import from_distance_matrix
 
 LOGGER = logging.getLogger(__name__)
 
 
-class Mast3rParer(BasePipelineStep):
+class Mast3rParer(PerSceneStep):
     def __init__(
         self,
         retriever: Retriever,
@@ -29,8 +29,15 @@ class Mast3rParer(BasePipelineStep):
         self.retriever = retriever
         self.scene_graph = scene_graph
 
-    @use_image_repository
-    def run(self, image_repository: ImageRepository) -> None:
+    def run_scene(
+        self,
+        *,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
+        input: Any = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
+    ) -> None:
         LOGGER.info("Compute pairs...")
         pairs = self._compute_pairs(image_repository)
         LOGGER.info("Computed %d pairs...", len(pairs))
@@ -94,7 +101,7 @@ class MstPairTriple(NamedTuple):
     filepaths_to_id_map: dict[str, int]
 
 
-class Mast3rDistanceParer(BasePipelineStep):
+class Mast3rDistanceParer(PerSceneStep):
     def __init__(
         self,
         retriever: Retriever,
@@ -102,12 +109,14 @@ class Mast3rDistanceParer(BasePipelineStep):
         super().__init__()
         self.retriever = retriever
 
-    def run(
+    def run_scene(
         self,
         *,
-        image_repository: BaseImageRepository,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
         input: Any = None,
-        state: dict[str, Any] = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
     ) -> Any:
         LOGGER.info("Compute pairs...")
         pairs = self._compute_pairs(image_repository)
@@ -118,7 +127,7 @@ class Mast3rDistanceParer(BasePipelineStep):
         image_repository.store("starting_pairs", pairs.mst_pairs)
 
         LOGGER.info("Add starting pairs to state...")
-        state["starting_pairs"] = pairs.mst_pairs
+        scene_state["starting_pairs"] = pairs.mst_pairs
 
     @property
     def device(self):

@@ -7,12 +7,12 @@ import torch
 from mast3r.model import AsymmetricMASt3R
 
 from mts.core.matching.dense.mast3r import match_pairs
+from mts.pipeline.repository.base import SceneScopedImageRepository
 from mts.core.model.mast3r.io import load_model
-from mts.pipeline.repository.inmemeory import ImageRepository
-from mts.pipeline.step.extract.kp.base import BasePipelineStep
+from mts.pipeline.step.base import PerSceneStep
 
 
-class Mast3rMatchPipelineStep(BasePipelineStep):
+class Mast3rMatchPipelineStep(PerSceneStep):
     def __init__(
         self,
         mast3r_model: AsymmetricMASt3R,
@@ -24,12 +24,14 @@ class Mast3rMatchPipelineStep(BasePipelineStep):
         self.min_pairs = min_pairs
         self.match_conf_th = match_conf_th
 
-    def run(
+    def run_scene(
         self,
         *,
-        image_repository: ImageRepository,
+        image_repository: SceneScopedImageRepository,
+        scene: str,
         input: Any = None,
-        state: dict[str, Any] = None,
+        state: dict[str, Any] | None = None,
+        scene_state: dict[str, Any] | None = None,
     ) -> Any:
         images_filepaths = [
             str(image_filepath) for image_filepath in image_repository.image_filepaths()

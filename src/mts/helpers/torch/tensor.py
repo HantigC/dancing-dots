@@ -8,10 +8,11 @@ def to(
     tensor_collection: TensorCollectionType,
     dtype=None,
     device=None,
+    non_blocking: bool = False,
 ) -> TensorCollectionType:
     # TODO: Maybe use a stack for recursive calls. Only if needed
     if isinstance(tensor_collection, torch.Tensor):
-        return tensor_collection.to(device=device, dtype=dtype)
+        return tensor_collection.to(device=device, dtype=dtype, non_blocking=non_blocking,)
     elif isinstance(tensor_collection, dict):
         return {
             key: to(value, dtype, device) for key, value in tensor_collection.items()
