@@ -385,8 +385,8 @@ def extract_dense_kpts(
         pred2["desc"].squeeze(0).detach(),
     )
     conf1, conf2 = (
-        pred1["desc_conf"].squeeze(0).detach(),
-        pred2["desc_conf"].squeeze(0).detach(),
+        pred1["conf"].squeeze(0).detach(),
+        pred2["conf"].squeeze(0).detach(),
     )
     corres = extract_correspondences_nonsym(
         desc1,
