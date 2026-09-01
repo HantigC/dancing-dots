@@ -236,6 +236,7 @@ def extract_correspondences_nonsym(
     ptmap_key="pred_desc",
     pixel_tol=0,
     max_iter=1,
+    conf_th=0.0,
 ):
     if "3d" in ptmap_key:
         opt = dict(device="cpu", workers=32)
@@ -245,45 +246,48 @@ def extract_correspondences_nonsym(
     HA, WA = A.shape[:2]
     HB, WB = B.shape[:2]
 
-    if pixel_tol == 0:
-        nn1to2 = fast_reciprocal_NNs(
-            A, B, subsample_or_initxy1=subsample, ret_xy=False, max_iter=max_iter, **opt
-        )
-        nn2to1 = fast_reciprocal_NNs(
-            B, A, subsample_or_initxy1=subsample, ret_xy=False, max_iter=max_iter, **opt
-        )
-    else:
-        S = subsample
-        yA, xA = torch.meshgrid(
-            torch.arange(S // 2, HA, S, device=device),
-            torch.arange(S // 2, WA, S, device=device),
-            indexing="ij",
-        )
-        yB, xB = torch.meshgrid(
-            torch.arange(S // 2, HB, S, device=device),
-            torch.arange(S // 2, WB, S, device=device),
-            indexing="ij",
-        )
-        xA, yA = xA.reshape(-1), yA.reshape(-1)
-        xB, yB = xB.reshape(-1), yB.reshape(-1)
-        nn1to2 = fast_reciprocal_NNs(
-            A,
-            B,
-            subsample_or_initxy1=(xA, yA),
-            ret_xy=False,
-            pixel_tol=pixel_tol,
-            max_iter=max_iter,
-            **opt,
-        )
-        nn2to1 = fast_reciprocal_NNs(
-            B,
-            A,
-            subsample_or_initxy1=(xB, yB),
-            ret_xy=False,
-            pixel_tol=pixel_tol,
-            max_iter=max_iter,
-            **opt,
-        )
+    # Build the subsampled query grid on each image, then prune it *before*
+    # matching: keep only grid points whose per-pixel confidence clears
+    # ``conf_th``. Those survivors are what we hand to ``fast_reciprocal_NNs``
+    # as the query set -- so we spend NN iterations only on confident points
+    # instead of matching everything and filtering afterwards.
+    S = subsample
+    yA, xA = torch.meshgrid(
+        torch.arange(S // 2, HA, S, device=device),
+        torch.arange(S // 2, WA, S, device=device),
+        indexing="ij",
+    )
+    yB, xB = torch.meshgrid(
+        torch.arange(S // 2, HB, S, device=device),
+        torch.arange(S // 2, WB, S, device=device),
+        indexing="ij",
+    )
+    xA, yA = xA.reshape(-1), yA.reshape(-1)
+    xB, yB = xB.reshape(-1), yB.reshape(-1)
+
+    keepA = confA[yA, xA] >= conf_th
+    keepB = confB[yB, xB] >= conf_th
+    xA, yA = xA[keepA], yA[keepA]
+    xB, yB = xB[keepB], yB[keepB]
+
+    nn1to2 = fast_reciprocal_NNs(
+        A,
+        B,
+        subsample_or_initxy1=(xA, yA),
+        ret_xy=False,
+        pixel_tol=pixel_tol,
+        max_iter=max_iter,
+        **opt,
+    )
+    nn2to1 = fast_reciprocal_NNs(
+        B,
+        A,
+        subsample_or_initxy1=(xB, yB),
+        ret_xy=False,
+        pixel_tol=pixel_tol,
+        max_iter=max_iter,
+        **opt,
+    )
 
     idx1 = torch.cat([nn1to2[0], nn2to1[1]])
     idx2 = torch.cat([nn1to2[1], nn2to1[0]])
@@ -397,6 +401,7 @@ def extract_dense_kpts(
         subsample=subsample,
         pixel_tol=pixel_tol,
         max_iter=max_iter,
+        conf_th=match_conf_th,
     )
     score = corres[2]
     mask = score >= match_conf_th
