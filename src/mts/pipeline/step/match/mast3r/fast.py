@@ -25,6 +25,31 @@ from mts.pipeline.step.base import PerSceneStep
 
 LOGGER = logging.getLogger(__name__)
 
+
+def _rebind_landscape_heads(mast3r_model) -> None:
+    """Re-point the ``head{1,2}`` landscape wrappers at this model's own heads.
+
+    ``AsymmetricCroCo3DStereo.set_downstream_head`` stores ``head1``/``head2`` as
+    plain closures produced by ``transpose_to_landscape(downstream_head{1,2})``.
+    ``copy.deepcopy`` copies functions by reference, so a cloned replica's
+    wrappers keep calling the *source* model's heads (and therefore its device).
+    Rebuilding the wrappers after a deepcopy makes each replica self-contained.
+    """
+    from dust3r.utils.misc import transpose_to_landscape
+
+    for i in (1, 2):
+        head_module = getattr(mast3r_model, f"downstream_head{i}", None)
+        if head_module is None:
+            continue
+        wrapper = getattr(mast3r_model, f"head{i}", None)
+        activate = getattr(wrapper, "__name__", "wrapper_yes") == "wrapper_yes"
+        setattr(
+            mast3r_model,
+            f"head{i}",
+            transpose_to_landscape(head_module, activate=activate),
+        )
+
+
 _IGNORE_IMAGE_KEYS = {
     "depthmap",
     "dataset",
@@ -66,7 +91,7 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
 
     def __init__(
         self,
-        mast3r_two_step: Mast3rTwoStep,
+        mast3r_two_step: Mast3rTwoStep | list[Mast3rTwoStep],
         devices: list[str] | str | None = None,
         keypoints_name: str = "mast3r",
         matches_name: str = "mast3r",
@@ -89,11 +114,23 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
 
         self._devices = [torch.device(d) for d in devices]
 
-        # one replica per device: reuse the given model for the first, clone
-        # it for the rest.
-        replicas = [mast3r_two_step]
-        for _ in range(len(self._devices) - 1):
-            replicas.append(copy.deepcopy(mast3r_two_step))
+        # one replica per device. A list of models (one already built per
+        # device, e.g. from ``from_checkpoint``) is used as-is; a single model
+        # is cloned for the extra devices. ``copy.deepcopy`` leaves the DPT
+        # ``head{1,2}`` landscape wrappers bound to the source model, so rebind
+        # them on every clone -- otherwise the head runs on the wrong device.
+        if isinstance(mast3r_two_step, (list, tuple)):
+            replicas = list(mast3r_two_step)
+            if len(replicas) != len(self._devices):
+                raise ValueError(
+                    f"got {len(replicas)} models for {len(self._devices)} devices"
+                )
+        else:
+            replicas = [mast3r_two_step]
+            for _ in range(len(self._devices) - 1):
+                clone = copy.deepcopy(mast3r_two_step)
+                _rebind_landscape_heads(clone.mast3r_model)
+                replicas.append(clone)
         self.replicas = nn.ModuleList(replicas)
         for replica, device in zip(self.replicas, self._devices):
             replica.to(device)
@@ -134,9 +171,23 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
         devices: list[str] | str = ("cuda:0",),
         **kwargs,
     ) -> "Mast3rFastMatchPipelineStep":
-        mast3r_model = load_model(mast3r_model_checkpoint, device=torch.device("cpu"))
-        mast3r_two_step = Mast3rTwoStep(mast3r_model)
-        return cls(mast3r_two_step, devices=devices, **kwargs)
+        if devices is None:
+            device_list = ["cpu"]
+        elif isinstance(devices, str):
+            device_list = [devices]
+        else:
+            device_list = list(devices)
+
+        # Load a fresh model straight onto each device instead of deepcopying
+        # one -- a deepcopy keeps the DPT head wrappers bound to the source
+        # model's device (see ``_rebind_landscape_heads``).
+        two_steps = [
+            Mast3rTwoStep(
+                load_model(mast3r_model_checkpoint, device=torch.device(device))
+            )
+            for device in device_list
+        ]
+        return cls(two_steps, devices=device_list, **kwargs)
 
     def run_scene(
         self,
@@ -170,9 +221,18 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
             str(image_repository.get_filepath(image_id)): image_id
             for image_id in encoding_cache
         }
-        # one cache copy per device (each pinned to that device)
+        # one cache copy per device (each pinned to that device). ``true_shape``
+        # is left on the host: the decoder head reads it via ``.cpu()`` and the
+        # dense extractor moves it itself, so keeping it off-GPU avoids needless
+        # transfers and ``.numpy()`` surprises downstream.
         device_caches = [
-            {iid: to(enc, device=device) for iid, enc in encoding_cache.items()}
+            {
+                iid: {
+                    key: (value if key == "true_shape" else value.to(device))
+                    for key, value in enc.items()
+                }
+                for iid, enc in encoding_cache.items()
+            }
             for device in self._devices
         ]
         try:
@@ -266,7 +326,6 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
                             continue
                         decoded[slot] = self._decode_pair(
                             self.replicas[slot],
-                            self._devices[slot],
                             cache[st_id],
                             cache[nd_id],
                         )
@@ -313,14 +372,12 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
     def _decode_pair(
         self,
         replica: Mast3rTwoStep,
-        device: torch.device,
         st_encoded: EncodedImageFeaturesDict,
         nd_encoded: EncodedImageFeaturesDict,
     ):
-        decoded = replica.decode_feature_pairs(
-            to(st_encoded, device=device),
-            to(nd_encoded, device=device),
-        )
+        # ``st_encoded`` / ``nd_encoded`` already live on ``replica``'s device
+        # (one cache copy per device, built in ``run_scene``).
+        decoded = replica.decode_feature_pairs(st_encoded, nd_encoded)
         decoded["st_features"]["true_shape"] = decoded["st_features"][
             "true_shape"
         ].squeeze()
