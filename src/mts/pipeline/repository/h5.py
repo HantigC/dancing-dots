@@ -216,6 +216,46 @@ class H5ImageRepository(BaseImageRepository):
             self.add_scene(img_id, scene or DEFAULT_SCENE)
         return img_id
 
+    def add_images(self, filepaths: list[PathLike], scene: str | None = None) -> list[int]:
+        """Adds multiple images to the repository in a single H5 transaction.
+
+        Unlike calling `add_image` in a loop, this creates all image groups
+        and grows the scene index in one batch rather than once per image.
+
+        Args:
+            filepaths: Paths to the image files.
+            scene: Scene these images belong to. See `add_image` for details
+                on scene assignment. If None (default), the images are
+                assigned to the default scene, `DEFAULT_SCENE` ("base").
+
+        Returns:
+            The unique identifiers assigned to the images, in the same
+            order as `filepaths`.
+        """
+        scene = scene or DEFAULT_SCENE
+        with self:
+            start_id = self._h5.attrs["next_id"]
+            image_ids = list(range(start_id, start_id + len(filepaths)))
+
+            images_grp = self._images_grp
+            for img_id, filepath in zip(image_ids, filepaths):
+                filepath = str(filepath)
+                if filepath in self._filepath_to_image_id:
+                    LOGGER.warning("`%s` already exists", filepath)
+
+                grp = images_grp.create_group(str(img_id))
+                grp.attrs["filepath"] = filepath
+                grp.attrs["scene"] = scene
+
+                self._image_id_to_filepath[img_id] = filepath
+                self._filepath_to_image_id[filepath] = img_id
+                self._image_id_to_scene[img_id] = scene
+
+            self._h5.attrs["next_id"] = start_id + len(image_ids)
+            self._append_many_to_scene_index(scene, image_ids)
+
+        return image_ids
+
     def _append_to_scene_index(self, scene: str, image_id: int) -> None:
         ds = self._scenes_grp.require_dataset(
             scene, shape=(0,), maxshape=(None,), dtype=np.int64
@@ -223,6 +263,16 @@ class H5ImageRepository(BaseImageRepository):
         n = len(ds)
         ds.resize((n + 1,))
         ds[n] = image_id
+
+    def _append_many_to_scene_index(self, scene: str, image_ids: list[int]) -> None:
+        if not image_ids:
+            return
+        ds = self._scenes_grp.require_dataset(
+            scene, shape=(0,), maxshape=(None,), dtype=np.int64
+        )
+        n = len(ds)
+        ds.resize((n + len(image_ids),))
+        ds[n:] = image_ids
 
     def _remove_from_scene_index(self, scene: str, image_id: int) -> None:
         scenes_grp = self._scenes_grp

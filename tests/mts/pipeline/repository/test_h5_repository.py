@@ -47,6 +47,58 @@ def test_image_filepaths(repo):
     assert set(repo.image_filepaths()) == {Path("a.jpg"), Path("b.jpg")}
 
 
+# --- add_images (batch) ----------------------------------------------------
+# H5ImageRepository overrides add_images to write the whole chunk in one H5
+# transaction instead of looping over add_image; these tests check it lines
+# up with add_image's behavior (ids, filepaths, scenes, scene index).
+
+
+def test_add_images_assigns_incrementing_ids(repo):
+    ids = repo.add_images(["a.jpg", "b.jpg", "c.jpg"])
+    assert ids == [0, 1, 2]
+    assert repo.images_num() == 3
+
+
+def test_add_images_roundtrips_filepaths(repo):
+    ids = repo.add_images(["a.jpg", "b.jpg"])
+    assert repo.get_filepath(ids[0]) == "a.jpg"
+    assert repo.get_filepath(ids[1]) == "b.jpg"
+    assert repo.get_image_id("a.jpg") == ids[0]
+    assert repo.get_image_id("b.jpg") == ids[1]
+
+
+def test_add_images_defaults_to_base_scene(repo):
+    ids = repo.add_images(["a.jpg", "b.jpg"])
+    assert all(repo.get_scene(img_id) == DEFAULT_SCENE for img_id in ids)
+
+
+def test_add_images_with_explicit_scene(repo):
+    ids = repo.add_images(["a.jpg", "b.jpg"], scene="scene_a")
+    assert all(repo.get_scene(img_id) == "scene_a" for img_id in ids)
+    assert set(repo.image_ids(scene="scene_a")) == set(ids)
+
+
+def test_add_images_continues_id_sequence_after_add_image(repo):
+    first_id = repo.add_image("a.jpg")
+    ids = repo.add_images(["b.jpg", "c.jpg"])
+    assert first_id == 0
+    assert ids == [1, 2]
+
+
+def test_add_images_two_batches_keep_separate_scene_indexes(repo):
+    first_ids = repo.add_images(["a.jpg", "b.jpg"], scene="scene_a")
+    second_ids = repo.add_images(["c.jpg", "d.jpg"], scene="scene_b")
+
+    assert set(repo.image_ids(scene="scene_a")) == set(first_ids)
+    assert set(repo.image_ids(scene="scene_b")) == set(second_ids)
+    assert repo.images_num() == 4
+
+
+def test_add_images_empty_list_returns_empty_list(repo):
+    assert repo.add_images([]) == []
+    assert repo.images_num() == 0
+
+
 # --- metadata -------------------------------------------------------------
 # Note: unlike the in-memory repository, H5ImageRepository.add_metadata does
 # not raise on a duplicate key (it warns and overwrites), and

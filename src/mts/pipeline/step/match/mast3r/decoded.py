@@ -9,6 +9,7 @@ import networkx as nx
 import numpy as np
 import torch
 from dust3r.utils.image import load_images
+from tqdm.auto import tqdm
 
 from mts.core.matching.dense.mast3r import (
     EncodedImageFeaturesDict,
@@ -54,19 +55,20 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
     correspondences for each. If a validated pair's decoding was never
     persisted (e.g. `Mast3rEncodeDecodeStep` was run with
     `store_pairs=False`), and a `mast3r_two_step` model was configured, it
-    is recomputed on the fly from the pair's persisted per-image encodings,
-    the same way `Mast3rEncodeDecodeStep` decodes a pair. If an image's
-    encoding was never persisted either (e.g. there is no
-    `Mast3rEncodeDecodeStep` in the pipeline at all), it is encoded on the
-    fly from the source image instead, the same way
-    `Mast3rEncodeDecodeStep._encode_all_images` does; that encoding is only
-    persisted back to the repository when `store_encodings=True`. Every
-    encoding obtained this way -- from the repository, freshly computed,
-    or already cached -- is kept in an in-memory cache for the rest of
-    the run so it is never fetched/computed twice; that cache holds
-    tensors on `device` only when `cache_encodings_on_device=True`,
-    otherwise it holds them on CPU (moved to `device` on each lookup) so
-    the cache doesn't pin every image's encoding in GPU/MPS memory.
+    is recomputed from the pair's per-image encodings, the same way
+    `Mast3rEncodeDecodeStep` decodes a pair.
+
+    Before any pair is decoded, `run` calls `_prepare_encodings` once to
+    populate an in-memory encoding cache for every repository image:
+    persisted encodings are loaded from the repository, and every
+    remaining image is batch-loaded and encoded with MASt3R in a single
+    pass (the same way `Mast3rEncodeDecodeStep._encode_all_images` does),
+    persisting the result back only when `store_encodings=True`. Pair
+    decoding then only ever reads from that cache -- it never loads or
+    encodes an image on the fly. The cache holds tensors on `device` only
+    when `cache_encodings_on_device=True`, otherwise it holds them on CPU
+    (moved to `device` on each lookup) so the cache doesn't pin every
+    image's encoding in GPU/MPS memory.
     """
 
     def __init__(
@@ -132,6 +134,7 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
         input: Any = None,
         state: dict[str, Any] = None,
     ) -> Any:
+        self._prepare_encodings(image_repository)
         keypoints_map, matches_map, match_kind_map = self._compute_matches(
             image_repository,
         )
@@ -304,55 +307,56 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
 
         return decoded["st_features"], decoded["nd_features"]
 
-    def _get_encoding(
-        self,
-        image_repository: BaseImageRepository,
-        image_id: ImageId,
-    ) -> EncodedImageFeaturesDict | None:
-        cached = self._encoding_cache.get(image_id)
-        if cached is not None:
-            if self.cache_encodings_on_device:
-                return cached
-            return to_device(cached, device=self._device)
+    def _prepare_encodings(self, image_repository: BaseImageRepository) -> None:
+        """Populates `_encoding_cache` for every repository image before
+        any pair is decoded: images with a persisted encoding are loaded
+        from the repository, everything else is batch-loaded and encoded
+        with MASt3R in a single pass (persisted back when
+        `store_encodings=True`)."""
+        image_ids = list(image_repository.image_ids())
+        missing_ids: list[ImageId] = []
+        for image_id in image_ids:
+            if image_id in self._encoding_cache:
+                continue
+            encoded_np = image_repository.load(f"{self.encodings_name}_{image_id}")
+            if encoded_np is None:
+                missing_ids.append(image_id)
+                continue
+            self._cache_encoding(image_id, from_np(encoded_np))
 
-        encoded_np = image_repository.load(f"{self.encodings_name}_{image_id}")
-        if encoded_np is not None:
-            cpu_encoded = from_np(encoded_np)
-            self._cache_encoding(image_id, cpu_encoded)
-            return to_device(cpu_encoded, device=self._device)
+        if not missing_ids:
+            return
 
-        device_encoded = self._encode_image(image_repository, image_id)
-        if device_encoded is None:
-            return None
+        if self.mast3r_two_step is None:
+            LOGGER.warning(
+                "No persisted encoding for %d image(s) and no MASt3R model configured to compute them",
+                len(missing_ids),
+            )
+            return
 
-        if self.store_encodings:
-            image_repository.store(f"{self.encodings_name}_{image_id}", to_numpy(device_encoded))
-
-        self._cache_encoding(image_id, to_device(device_encoded, device=torch.device("cpu")))
-        return device_encoded
-
-    def _cache_encoding(
-        self,
-        image_id: ImageId,
-        cpu_encoded: EncodedImageFeaturesDict,
-    ) -> None:
-        if self.cache_encodings_on_device:
-            self._encoding_cache[image_id] = to_device(cpu_encoded, device=self._device)
-        else:
-            self._encoding_cache[image_id] = cpu_encoded
-
-    def _encode_image(
-        self,
-        image_repository: BaseImageRepository,
-        image_id: ImageId,
-    ) -> EncodedImageFeaturesDict | None:
-        filepath = str(image_repository.get_filepath(image_id))
+        LOGGER.info("Encoding %d image(s) with MASt3R...", len(missing_ids))
+        filepaths = [str(image_repository.get_filepath(image_id)) for image_id in missing_ids]
         try:
-            image = load_images([filepath], size=self.image_size, verbose=False)[0]
+            images = load_images(filepaths, size=self.image_size, verbose=False)
         except Exception:
-            LOGGER.exception("Could not load image %s for on-the-fly MASt3R encoding", image_id)
-            return None
+            LOGGER.exception("Could not load images for MASt3R encoding")
+            return
 
+        for image_id, image in zip(missing_ids, tqdm(images, desc="Encoding images")):
+            encoded = self._encode_loaded_image(image_id, image)
+            if encoded is None:
+                continue
+
+            if self.store_encodings:
+                image_repository.store(f"{self.encodings_name}_{image_id}", to_numpy(encoded))
+
+            self._cache_encoding(image_id, to_device(encoded, device=torch.device("cpu")))
+
+    def _encode_loaded_image(
+        self,
+        image_id: ImageId,
+        image: dict[str, Any],
+    ) -> EncodedImageFeaturesDict | None:
         ignore_keys = {"depthmap", "dataset", "label", "instance", "idx", "true_shape", "rng"}
         for name in image.keys():
             if name in ignore_keys:
@@ -373,7 +377,35 @@ class Mast3rDecodedMatchPipelineStep(BasePipelineStep):
                     {"image": img, "true_shape": true_shape},
                 )
         except Exception:
-            LOGGER.exception("Could not encode image %s for on-the-fly MASt3R decoding", image_id)
+            LOGGER.exception("Could not encode image %s with MASt3R", image_id)
             return None
 
         return EncodedImageFeaturesDict.from_add_shape(encoded_image_dict, true_shape)
+
+    def _cache_encoding(
+        self,
+        image_id: ImageId,
+        cpu_encoded: EncodedImageFeaturesDict,
+    ) -> None:
+        if self.cache_encodings_on_device:
+            self._encoding_cache[image_id] = to_device(cpu_encoded, device=self._device)
+        else:
+            self._encoding_cache[image_id] = cpu_encoded
+
+    def _get_encoding(
+        self,
+        image_repository: BaseImageRepository,
+        image_id: ImageId,
+    ) -> EncodedImageFeaturesDict | None:
+        cached = self._encoding_cache.get(image_id)
+        if cached is None:
+            LOGGER.warning(
+                "No cached MASt3R encoding for %s; _prepare_encodings should have "
+                "populated it upfront",
+                image_id,
+            )
+            return None
+
+        if self.cache_encodings_on_device:
+            return cached
+        return to_device(cached, device=self._device)

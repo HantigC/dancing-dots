@@ -73,6 +73,23 @@ class BaseImageRepository(ABC):
         """
         pass
 
+    def add_images(
+        self, filepaths: list[str], scene: str | None = None
+    ) -> list[ImageId]:
+        """Adds multiple images to the repository.
+
+        Args:
+            filepaths: Paths to the image files.
+            scene: Scene these images belong to. See `add_image` for details
+                on scene assignment. If None (default), the images are
+                assigned to the default scene, `DEFAULT_SCENE` ("base").
+
+        Returns:
+            The unique identifiers assigned to the images, in the same
+            order as `filepaths`.
+        """
+        return [self.add_image(filepath, scene=scene) for filepath in filepaths]
+
     @abstractmethod
     def add_scene(self, image_id: ImageId, scene: str) -> None:
         """Assigns (or reassigns) the scene an image belongs to.
