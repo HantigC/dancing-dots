@@ -1,0 +1,61 @@
+name: IMC2025
+description: |
+  Use NetVLAD global descriptors + kNN for pair creation
+  Use the MASt3R fast multi-GPU matcher (encode-once, decode-per-pair, all-torch
+  reciprocal-NN match extraction) over the proposed pairs; one model replica per
+  entry in `devices`, pairs walked `len(devices)` at a time
+  No reconstruction step -- stop after matching (same as 0025 minus ColmapReconstructionStep)
+
+project_path: iterations
+data_dirpath: 'data/image-matching-challenge-2025'
+sample_filepath: null
+run_type: train
+origin: None
+git_commit: None
+datasets_names: null
+save_project_to_git: False
+submission_dest_dirpath: null
+tag: NetVlad+Mast3r+fast-multigpu+norecon
+mark: null
+zip_project: False
+zip_dest: None
+delete_repo: False
+
+pipeline_steps:
+  embedder:
+    _target_: mts.pipeline.step.base.OnDeviceRunner
+    device: cuda:0
+    step:
+      _target_: mts.pipeline.step.extract.embedding.base.GlobalDescriptorStep
+      max_size: 1024
+      global_extractor:
+        _target_: mts.core.embedder.vlad.NetVladEmbedding
+        model_location: model-weights/net-vlad
+
+  pairing:
+    _target_: mts.pipeline.step.pair.knn.KnnEmbeddingParerStep
+    k: 20
+    min_distance_th: 0.0
+    distance_th: 10
+    max_pairs_per_image: 15
+    max_pairs: 1000
+
+  # Places its own model replicas -- NOT wrapped in OnDeviceRunner.
+  kp_matching:
+    _target_: mts.pipeline.step.match.mast3r.fast.Mast3rFastMatchPipelineStep.from_checkpoint
+    mast3r_model_checkpoint: 'model-weights/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth'
+    devices: [cuda:0, cuda:1]
+    keypoints_name: mast3r
+    matches_name: mast3r
+    image_size: 512
+    match_conf_th: 1.01
+    min_pairs: 200
+    subsample: 8
+    pixel_tol: 4
+    max_iter: 1
+    validate: true
+
+reconstruction_runner:
+  create_pipeline_method: app.imc2025.pipeline.create_pipeline
+  create_repository_method: app.imc2025.pipeline.create_h5_repository
+  create_pipeline_state_method: app.imc2025.pipeline.create_pipeline_state

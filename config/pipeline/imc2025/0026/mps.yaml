@@ -1,0 +1,7 @@
+pipeline_steps:
+  embedder:
+    device: mps
+
+  # kp_matching is not an OnDeviceRunner here -- override its `devices` list.
+  kp_matching:
+    devices: [mps]
