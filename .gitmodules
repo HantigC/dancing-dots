@@ -10,3 +10,6 @@
 [submodule "deps/submodules/Hierarchical-Localization"]
 	path = deps/submodules/Hierarchical-Localization
 	url = https://github.com/HantigC/Hierarchical-Localization.git
+[submodule "deps/submodules/fast3r"]
+	path = deps/submodules/fast3r
+	url = https://github.com/HantigC/fast3r.git

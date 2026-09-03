@@ -24,21 +24,29 @@ dependencies = [
     "huggingface_hub==0.36.2",
     "trimesh>=4.0.0",
     "manifold3d>=3.0.0",
-    # Local packages
-    # wheels
-    "croco",
-    "dust3r",
-    "mast3r",
-    # submodules
-    "gim",
-    "lightglue",
-    "asmk",
-    "romatch",
 ]
 
 [project.optional-dependencies]
 kaggle = [
     "kagglehub>=0.3",
+]
+mast3r = [
+    "asmk",
+    "croco",
+    "dust3r",
+    "mast3r",
+]
+gim = [
+    "gim",
+]
+lightglue = [
+    "lightglue",
+]
+roma = [
+    "romatch",
+]
+fast3r = [
+    "fast3r",
 ]
 
 [dependency-groups]
@@ -62,6 +70,8 @@ dev = [
 ]
 [tool.uv]
 package = true
+# fast3r pins numpy<2.0.0; this project standardises on numpy 2.3.4.
+override-dependencies = ["numpy==2.3.4"]
 
 [tool.uv.extra-build-dependencies]
 asmk = [
@@ -94,6 +104,7 @@ asmk = { path = "deps/submodules/asmk" }
 lightglue = { path = "deps/submodules/lightglue", editable = true}
 gim = { path = "deps/submodules/gim", editable = true }
 hloc = { path = "deps/submodules/Hierarchical-Localization" }
+fast3r = { path = "deps/submodules/fast3r", editable = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
