@@ -19,6 +19,7 @@ dependencies = [
     "pycolmap==3.13.0",
     "shapely==2.1.2",
     "torch==2.5.1",
+    "torchvision==0.20.1",
     "tqdm>=4.67.1",
     "transformers==4.57.1",
     "huggingface_hub==0.36.2",

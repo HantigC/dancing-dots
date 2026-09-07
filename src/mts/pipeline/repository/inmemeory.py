@@ -179,6 +179,23 @@ class ImageRepository(BaseImageRepository):
         key = tuple(sorted((img_id1, img_id2)))
         return self._matches.get(key, {}).get(name)
 
+    def iterate_over_matches(
+        self, *, name: str = "matches", scene: str | None = None
+    ) -> Generator[tuple[PairType[int], np.ndarray], None, None]:
+        if scene is not None:
+            for pair in self.get_pairs(scene=scene):
+                key = tuple(sorted(pair))
+                named = self._matches.get(key)
+                if named is None or name not in named:
+                    continue
+                yield key, named[name]
+            return
+
+        for (id1, id2), named in self._matches.items():
+            if name not in named:
+                continue
+            yield (id1, id2), named[name]
+
     def add_match_metadata(self, img_id1: int, img_id2: int, **kwargs):
         key = tuple(sorted((img_id1, img_id2)))
         pair_meta = self._match_metadata.setdefault(key, {})

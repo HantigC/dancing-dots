@@ -51,9 +51,10 @@ pipeline_steps:
     match_conf_th: 1.01
     min_pairs: 200
     subsample: 8
-    pixel_tol: 4
-    max_iter: 1
-    validate: true
+    pixel_tol: 0
+    search_subsample: 4
+    max_iter: 3
+    validate: false
 
   reconstruction:
     _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep

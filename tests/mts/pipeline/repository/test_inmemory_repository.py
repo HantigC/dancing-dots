@@ -184,6 +184,47 @@ def test_get_stored_pairs(repo):
     assert repo.get_stored_pairs("homography") == [(id_a, id_b)]
 
 
+# --- matches -------------------------------------------------------------
+
+
+def test_iterate_over_matches_yields_all_by_default(repo):
+    a, b, c = repo.add_images(["a.jpg", "b.jpg", "c.jpg"])
+    repo.add_matches(a, b, np.zeros((2, 2), dtype=np.int64))
+    repo.add_matches(b, c, np.zeros((3, 2), dtype=np.int64))
+
+    result = {pair: m.shape for pair, m in repo.iterate_over_matches()}
+    assert result == {(a, b): (2, 2), (b, c): (3, 2)}
+
+
+def test_iterate_over_matches_filters_by_name(repo):
+    a, b = repo.add_images(["a.jpg", "b.jpg"])
+    repo.add_matches(a, b, np.zeros((2, 2), dtype=np.int64), name="sift")
+
+    assert [pair for pair, _ in repo.iterate_over_matches(name="sift")] == [(a, b)]
+    assert list(repo.iterate_over_matches(name="mast3r")) == []
+
+
+def test_iterate_over_matches_filters_by_scene(repo):
+    a0, a1 = repo.add_images(["a0.jpg", "a1.jpg"], scene="scene_a")
+    b0, b1 = repo.add_images(["b0.jpg", "b1.jpg"], scene="scene_b")
+    repo.add_pairs([(a0, a1)])
+    repo.add_pairs([(b0, b1)])
+    repo.add_matches(a0, a1, np.zeros((2, 2), dtype=np.int64))
+    repo.add_matches(b0, b1, np.zeros((3, 2), dtype=np.int64))
+
+    assert [pair for pair, _ in repo.iterate_over_matches(scene="scene_a")] == [(a0, a1)]
+    assert [pair for pair, _ in repo.iterate_over_matches(scene="scene_b")] == [(b0, b1)]
+    assert list(repo.iterate_over_matches(scene="unknown")) == []
+
+
+def test_iterate_over_matches_scene_skips_pairs_without_a_stored_match(repo):
+    a0, a1, a2 = repo.add_images(["a0.jpg", "a1.jpg", "a2.jpg"], scene="scene_a")
+    repo.add_pairs([(a0, a1), (a1, a2)])
+    repo.add_matches(a0, a1, np.zeros((2, 2), dtype=np.int64))
+
+    assert [pair for pair, _ in repo.iterate_over_matches(scene="scene_a")] == [(a0, a1)]
+
+
 # --- scenes (new behavior) -------------------------------------------------
 
 
@@ -245,3 +286,25 @@ def test_add_pairs_raises_when_pair_spans_two_scenes(repo):
     id_b = repo.add_image("b.jpg", scene="scene_b")
     with pytest.raises(RepositoryException):
         repo.add_pairs([(id_a, id_b)])
+
+
+def test_scenes_empty_when_no_images(repo):
+    assert repo.scenes() == []
+
+
+def test_scenes_lists_only_populated_scenes_sorted(repo):
+    repo.add_image("b.jpg", scene="scene_b")
+    repo.add_image("a.jpg", scene="scene_a")
+    repo.add_image("d.jpg")
+    assert repo.scenes() == ["base", "scene_a", "scene_b"]
+
+
+def test_scenes_excludes_default_scene_when_unused(repo):
+    repo.add_image("a.jpg", scene="scene_a")
+    assert repo.scenes() == ["scene_a"]
+
+
+def test_scenes_ignores_scene_left_empty_by_reassignment(repo):
+    img_id = repo.add_image("a.jpg", scene="scene_a")
+    repo.add_scene(img_id, "scene_b")
+    assert repo.scenes() == ["scene_b"]

@@ -103,6 +103,7 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
         max_iter: int = 1,
         top_k_matches: int | None = None,
         validate: bool = True,
+        search_subsample: int | None = None,
     ) -> None:
         super().__init__()
         if devices is None:
@@ -145,6 +146,7 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
         self.max_iter = max_iter
         self.top_k_matches = top_k_matches
         self.validate = validate
+        self.search_subsample = search_subsample
 
     @property
     def device(self) -> torch.device:
@@ -405,6 +407,7 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
                 pixel_tol=self.pixel_tol,
                 max_iter=self.max_iter,
                 top_k=self.top_k_matches,
+                search_subsample=self.search_subsample,
             )
         except Exception:
             LOGGER.exception(

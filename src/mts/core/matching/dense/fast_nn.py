@@ -10,6 +10,7 @@ returns tensors -- the caller is responsible for moving results to CPU.
 """
 
 import math
+from dataclasses import dataclass
 
 import numpy as np
 import torch
@@ -141,6 +142,22 @@ def merge_corres_torch(
     return xy1, xy2
 
 
+@dataclass
+class SearchSpaceConfig:
+    """Restricts the nearest-neighbour search space used by :func:`fast_reciprocal_NNs`.
+
+    By default each round of reciprocal matching searches over *every*
+    pixel of ``pts1`` / ``pts2``. Passing indices here trims the gallery
+    each tree is built over to a subset of flat ``(H*W)`` indices -- e.g. a
+    window around an expected location, or points passing some earlier
+    confidence/mask filter -- instead of the whole feature map. Either side
+    may be left as ``None`` to keep it unrestricted.
+    """
+
+    indices1: torch.Tensor | None = None
+    indices2: torch.Tensor | None = None
+
+
 def fast_reciprocal_NNs(
     pts1,
     pts2,
@@ -150,6 +167,7 @@ def fast_reciprocal_NNs(
     ret_basin=False,
     device="cuda",
     max_iter: int = 1,
+    search_space: SearchSpaceConfig | None = None,
     **matcher_kw,
 ):
     H1, W1, DIM1 = pts1.shape
@@ -177,8 +195,15 @@ def fast_reciprocal_NNs(
     old_xy1 = xy1.clone()
     old_xy2 = xy2.clone()
 
-    tree1 = cdistMatcher(pts1, device=device)
-    tree2 = cdistMatcher(pts2, device=device)
+    # Trim the search space each tree is built over, if configured. Results
+    # come back as indices into the trimmed gallery, so they're remapped
+    # through `indicesN` back to flat (H*W) indices below.
+    indices1 = search_space.indices1 if search_space is not None else None
+    indices2 = search_space.indices2 if search_space is not None else None
+    tree1_pts = pts1[indices1] if indices1 is not None else pts1
+    tree2_pts = pts2[indices2] if indices2 is not None else pts2
+    tree1 = cdistMatcher(tree1_pts, device=device)
+    tree2 = cdistMatcher(tree2_pts, device=device)
 
     notyet = torch.ones(xy1.shape[0], dtype=torch.bool, device=device)
     basin = (
@@ -190,11 +215,15 @@ def fast_reciprocal_NNs(
     niter = 0
     while notyet.any():
         _, xy2_upd = tree2.query(pts1[xy1[notyet]], **matcher_kw)
+        if indices2 is not None:
+            xy2_upd = indices2[xy2_upd]
         xy2[notyet] = xy2_upd
         if not ret_basin:
             notyet &= old_xy2 != xy2  # remove points that have converged
 
         _, xy1_upd = tree1.query(pts2[xy2[notyet]], **matcher_kw)
+        if indices1 is not None:
+            xy1_upd = indices1[xy1_upd]
         xy1[notyet] = xy1_upd
         notyet &= old_xy1 != xy1  # remove points that have converged
 
@@ -237,6 +266,8 @@ def extract_correspondences_nonsym(
     pixel_tol=0,
     max_iter=1,
     conf_th=0.0,
+    search_space: SearchSpaceConfig | None = None,
+    search_subsample: int | None = None,
 ):
     if "3d" in ptmap_key:
         opt = dict(device="cpu", workers=32)
@@ -291,6 +322,102 @@ def extract_correspondences_nonsym(
 
     idx1 = torch.cat([nn1to2[0], nn2to1[1]])
     idx2 = torch.cat([nn1to2[1], nn2to1[0]])
+
+    c1 = confA.reshape(-1)[idx1]
+    c2 = confB.reshape(-1)[idx2]
+
+    xy1, xy2, idx = merge_corres_torch(
+        idx1, idx2, (HA, WA), (HB, WB), ret_xy=True, ret_index=True
+    )
+    conf = torch.minimum(c1[idx], c2[idx])
+
+    corres = (xy1.clone(), xy2.clone(), conf)
+    return corres
+
+
+def _stride_flat_indices(
+    H: int, W: int, stride: int, device
+) -> torch.Tensor:
+    """Flat ``(H*W)`` indices of an ``stride``-spaced grid.
+
+    Uses the same half-stride offset as the default query grid built inline
+    in :func:`fast_reciprocal_NNs`, so passing the same value as ``subsample``
+    here lines the search-space grid up with the query grid.
+    """
+    y, x = torch.meshgrid(
+        torch.arange(stride // 2, H, stride, device=device),
+        torch.arange(stride // 2, W, stride, device=device),
+        indexing="ij",
+    )
+    x, y = x.reshape(-1), y.reshape(-1)
+    return (x + W * y).to(torch.long)
+
+
+def extract_correspondences_onesided(
+    A,
+    B,
+    confA,
+    confB,
+    subsample=8,
+    device=None,
+    ptmap_key="pred_desc",
+    pixel_tol=0,
+    max_iter=1,
+    conf_th=0.0,
+    search_space: SearchSpaceConfig | None = None,
+    search_subsample: int | None = None,
+):
+    """One-directional counterpart of :func:`extract_correspondences_nonsym`.
+
+    ``extract_correspondences_nonsym`` runs ``fast_reciprocal_NNs`` twice --
+    once seeded from ``A``'s grid, once from ``B``'s -- and merges both
+    passes. This runs it just once, seeded from ``A``'s (confidence-pruned)
+    grid, matching into ``B``. Correspondences found only when starting the
+    search from ``B`` are not recovered. ``search_space`` is forwarded to
+    :func:`fast_reciprocal_NNs` to optionally trim the NN gallery on either
+    side instead of searching every point of ``A`` / ``B``.
+
+    ``search_subsample``, if given, is a stride: only every ``search_subsample``-th
+    descriptor of ``A`` and ``B`` (on the same offset grid as ``subsample``)
+    is kept as an NN candidate. It's a convenience for the common "just
+    stride the whole search space" case and is ignored if ``search_space``
+    is passed explicitly.
+    """
+    if "3d" in ptmap_key:
+        opt = dict(device="cpu", workers=32)
+    else:
+        opt = dict(device=device, dist="dot", block_size=2**13)
+
+    HA, WA = A.shape[:2]
+    HB, WB = B.shape[:2]
+
+    if search_subsample is not None and search_space is None:
+        search_space = SearchSpaceConfig(
+            indices1=_stride_flat_indices(HA, WA, search_subsample, device),
+            indices2=_stride_flat_indices(HB, WB, search_subsample, device),
+        )
+
+    S = subsample
+    yA, xA = torch.meshgrid(
+        torch.arange(S // 2, HA, S, device=device),
+        torch.arange(S // 2, WA, S, device=device),
+        indexing="ij",
+    )
+    xA, yA = xA.reshape(-1), yA.reshape(-1)
+
+    keepA = confA[yA, xA] >= conf_th
+    xA, yA = xA[keepA], yA[keepA]
+
+    idx1, idx2 = fast_reciprocal_NNs(
+        A,
+        B,
+        subsample_or_initxy1=(xA, yA),
+        ret_xy=False,
+        pixel_tol=pixel_tol,
+        max_iter=max_iter,
+        search_space=search_space,
+        **opt,
+    )
 
     c1 = confA.reshape(-1)[idx1]
     c2 = confB.reshape(-1)[idx2]
@@ -383,6 +510,7 @@ def extract_dense_kpts(
     pixel_tol: int = 0,
     subsample: int = 8,
     max_iter: int = 1,
+    search_subsample: int | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     desc1, desc2 = (
         pred1["desc"].squeeze(0).detach(),
@@ -392,7 +520,7 @@ def extract_dense_kpts(
         pred1["conf"].squeeze(0).detach(),
         pred2["conf"].squeeze(0).detach(),
     )
-    corres = extract_correspondences_nonsym(
+    corres = extract_correspondences_onesided(
         desc1,
         desc2,
         conf1,
@@ -402,6 +530,7 @@ def extract_dense_kpts(
         pixel_tol=pixel_tol,
         max_iter=max_iter,
         conf_th=match_conf_th,
+        search_subsample=search_subsample,
     )
     score = corres[2]
     mask = score >= match_conf_th
@@ -458,6 +587,7 @@ def dense_extract(
     pixel_tol: int = 0,
     max_iter: int = 1,
     top_k: int | None = None,
+    search_subsample: int | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     st_kpts, nd_kpts = extract_dense_kpts(
         decoded_feature_pairs["st_features"],
@@ -471,5 +601,6 @@ def dense_extract(
         top_k=top_k,
         pixel_tol=pixel_tol,
         max_iter=max_iter,
+        search_subsample=search_subsample,
     )
     return st_kpts, nd_kpts

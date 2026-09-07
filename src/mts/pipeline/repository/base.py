@@ -328,7 +328,9 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
-    def add_keypoints(self, img_id: ImageId, keypoints: np.ndarray, *, name: str = "keypoints") -> None:
+    def add_keypoints(
+        self, img_id: ImageId, keypoints: np.ndarray, *, name: str = "keypoints"
+    ) -> None:
         """Stores a named set of keypoints for an image.
 
         Args:
@@ -339,7 +341,9 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
-    def get_keypoints(self, img_id: ImageId, *, name: str = "keypoints") -> np.ndarray | None:
+    def get_keypoints(
+        self, img_id: ImageId, *, name: str = "keypoints"
+    ) -> np.ndarray | None:
         """Retrieves a named set of keypoints for an image.
 
         Args:
@@ -352,7 +356,9 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
-    def add_descriptors(self, img_id: ImageId, descriptors: np.ndarray, *, name: str = "descriptors") -> None:
+    def add_descriptors(
+        self, img_id: ImageId, descriptors: np.ndarray, *, name: str = "descriptors"
+    ) -> None:
         """Stores a named set of local feature descriptors for an image.
 
         Args:
@@ -363,7 +369,9 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
-    def get_descriptors(self, img_id: ImageId, *, name: str = "descriptors") -> np.ndarray | None:
+    def get_descriptors(
+        self, img_id: ImageId, *, name: str = "descriptors"
+    ) -> np.ndarray | None:
         """Retrieves a named set of local feature descriptors for an image.
 
         Args:
@@ -437,9 +445,27 @@ class BaseImageRepository(ABC):
         pass
 
     @abstractmethod
-    def add_match_metadata(
-        self, img_id1: ImageId, img_id2: ImageId, **kwargs
-    ) -> None:
+    def iterate_over_matches(
+        self,
+        *,
+        name: str = "matches",
+        scene: str | None = None,
+    ) -> Generator[tuple[PairType[ImageId], np.ndarray], None, None]:
+        """Iterates over all stored match pairs of a given name.
+
+        Args:
+            name: Name identifying the match type (e.g. "sift", "mast3r").
+            scene: If given, only walk the pairs registered for this scene
+                (via :meth:`get_pairs`) and yield the ones that have a
+                stored match. If None (default), yield every stored match.
+
+        Yields:
+            A tuple ``((img_id1, img_id2), matches)`` with ``img_id1 < img_id2``.
+        """
+        pass
+
+    @abstractmethod
+    def add_match_metadata(self, img_id1: ImageId, img_id2: ImageId, **kwargs) -> None:
         pass
 
     @abstractmethod
@@ -634,13 +660,14 @@ class SceneScopedImageRepository:
 
     Image enumeration (``image_ids``, ``image_filepaths``,
     ``iterate_over_images``, ``images_num``), pairs (``get_pairs``,
-    ``pair_num``, ``get_stored_pairs``), scene listing (``scenes``) and
-    named blob storage (``store``/``load``) are transparently scoped to a
-    single scene. Image insertion (``add_image``/``add_images``) is forced
-    into that scene. Every other call -- anything keyed by a
-    globally-unique image id or image-id pair (keypoints, descriptors,
-    matches, poses, per-image/per-pair metadata, ``store_pair`` ...) --
-    is delegated unchanged to the wrapped repository.
+    ``pair_num``, ``get_stored_pairs``), match iteration
+    (``iterate_over_matches``), scene listing (``scenes``) and named blob
+    storage (``store``/``load``) are transparently scoped to a single
+    scene. Image insertion (``add_image``/``add_images``) is forced into
+    that scene. Every other call -- anything keyed by a globally-unique
+    image id or image-id pair (keypoints, descriptors, per-pair matches,
+    poses, per-image/per-pair metadata, ``store_pair`` ...) -- is
+    delegated unchanged to the wrapped repository.
 
     Pipeline steps built on :class:`PerSceneStep` receive one of these as
     their ``image_repository`` so their bodies can stay scene-agnostic.
@@ -703,6 +730,16 @@ class SceneScopedImageRepository:
 
     def pair_num(self) -> int:
         return len(self._repository.get_pairs(scene=self._scene))
+
+    # -- matches (scoped) -------------------------------------------------
+
+    def iterate_over_matches(
+        self, *, name: str = "matches"
+    ) -> Generator[Tuple[PairType, np.ndarray], None, None]:
+        return self._repository.iterate_over_matches(
+            name=name,
+            scene=self._scene,
+        )
 
     def get_stored_pairs(self, name: str) -> list[PairType[ImageId]]:
         scene_ids = set(self._repository.image_ids(scene=self._scene))

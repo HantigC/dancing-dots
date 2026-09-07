@@ -562,11 +562,31 @@ class H5ImageRepository(BaseImageRepository):
         self,
         *,
         name: str = "matches",
+        scene: str | None = None,
     ) -> Generator[
         tuple[PairType[int], np.ndarray],
         None,
         None,
     ]:
+        if scene is not None:
+            # Only walk this scene's pairs instead of scanning every match.
+            scene_pairs = self.get_pairs(scene=scene)
+            with self._reading() as h_reading:
+                if "matches" not in h_reading:
+                    return
+                named_grp = h_reading["matches"].get(name)
+                if named_grp is None:
+                    return
+                for img_id1, img_id2 in scene_pairs:
+                    key = self._pair_key(img_id1, img_id2)
+                    if key not in named_grp:
+                        continue
+                    st_image_id, nd_image_id = int(min(img_id1, img_id2)), int(
+                        max(img_id1, img_id2)
+                    )
+                    yield (st_image_id, nd_image_id), named_grp[key][:]
+            return
+
         with self._reading() as h_reading:
             if "matches" not in h_reading:
                 return
