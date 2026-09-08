@@ -52,7 +52,6 @@ pipeline_steps:
     min_pairs: 200
     subsample: 8
     pixel_tol: 0
-    search_subsample: 4
     max_iter: 3
     validate: false
 
