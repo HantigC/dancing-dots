@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 import torch
 from mast3r.model import AsymmetricMASt3R
+from tqdm.auto import tqdm
 
 from mts.core.matching.dense.merge.round import merge_matches
 from mts.core.model.mast3r.io import load_model
@@ -46,7 +47,7 @@ class Mast3rRefineMatchPipelineStep(PerSceneStep):
         min_pairs: int = 15,
         max_image_size: int | None = None,
         pixel_tol: int = 5,
-        subsample: int = 8,
+        subsample: int = 16,
         max_batch_size: int = 48,
         overlap: float = 0.5,
         conf_thr: float | None = None,
@@ -78,20 +79,21 @@ class Mast3rRefineMatchPipelineStep(PerSceneStep):
         state: dict[str, Any] | None = None,
         scene_state: dict[str, Any] | None = None,
     ) -> Any:
-        pairs = image_repository.get_pairs()
+        pair_num = image_repository.pair_num()
         LOGGER.info(
             "Refining '%s' matches over %d pairs (scene '%s')",
             self.source_matches_name,
-            len(pairs),
+            pair_num,
             scene,
         )
 
         out_match: dict[str, dict[str, np.ndarray]] = {}
         refined_pairs = 0
-        for st_image_id, nd_image_id in pairs:
-            seed_matches = image_repository.get_matches(
-                st_image_id, nd_image_id, name=self.source_matches_name
-            )
+        for (st_image_id, nd_image_id), seed_matches in tqdm(
+            image_repository.iterate_over_matches(name=self.source_matches_name),
+            total=pair_num,
+            desc=f"Refining '{self.source_matches_name}' matches ({scene})",
+        ):
             if seed_matches is None or len(seed_matches) < self.min_pairs:
                 continue
 
@@ -117,7 +119,7 @@ class Mast3rRefineMatchPipelineStep(PerSceneStep):
                     matches_im0,
                     matches_im1,
                     self.mast3r_model,
-                    device=self.device,
+                    device=str(self.device),
                     max_image_size=self.max_image_size,
                     pixel_tol=self.pixel_tol,
                     subsample=self.subsample,
@@ -165,7 +167,7 @@ class Mast3rRefineMatchPipelineStep(PerSceneStep):
         LOGGER.info(
             "Refined %d/%d pairs for scene '%s' -> '%s' (%d images, %d match pairs)",
             refined_pairs,
-            len(pairs),
+            pair_num,
             scene,
             self.target_matches_name,
             len(global_keypoints),
