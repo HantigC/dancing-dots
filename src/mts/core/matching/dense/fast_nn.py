@@ -511,6 +511,7 @@ def extract_dense_kpts(
     subsample: int = 8,
     max_iter: int = 1,
     search_subsample: int | None = None,
+    size_param: int = 512,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     desc1, desc2 = (
         pred1["desc"].squeeze(0).detach(),
@@ -571,8 +572,8 @@ def extract_dense_kpts(
         empty = torch.empty(0, device=device)
         return empty, empty
 
-    matches_im0_org = transform_keypoints_to_original(matches_im0, st_original_hw_shape)
-    matches_im1_org = transform_keypoints_to_original(matches_im1, nd_original_hw_shape)
+    matches_im0_org = transform_keypoints_to_original(matches_im0, st_original_hw_shape, size_param=size_param)
+    matches_im1_org = transform_keypoints_to_original(matches_im1, nd_original_hw_shape, size_param=size_param)
     return matches_im0_org, matches_im1_org
 
 
@@ -587,6 +588,7 @@ def dense_extract(
     pixel_tol: int = 0,
     max_iter: int = 1,
     top_k: int | None = None,
+    size_param: int = 256,
     search_subsample: int | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     st_kpts, nd_kpts = extract_dense_kpts(
@@ -602,5 +604,6 @@ def dense_extract(
         pixel_tol=pixel_tol,
         max_iter=max_iter,
         search_subsample=search_subsample,
+        size_param=size_param,
     )
     return st_kpts, nd_kpts
