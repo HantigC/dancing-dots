@@ -103,6 +103,7 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
         max_iter: int = 1,
         top_k_matches: int | None = None,
         validate: bool = True,
+        validate_max_error: float = 2.0,
         search_subsample: int | None = None,
     ) -> None:
         super().__init__()
@@ -146,6 +147,7 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
         self.max_iter = max_iter
         self.top_k_matches = top_k_matches
         self.validate = validate
+        self.validate_max_error = validate_max_error
         self.search_subsample = search_subsample
 
     @property
@@ -444,26 +446,43 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
             str(image_repository.get_filepath(image_id)): size
             for image_id, size in original_sizes.items()
         }
+        total_pairs = sum(len(nd_map) for nd_map in out_match.values())
+        LOGGER.info(
+            "Mast3rFastMatchPipelineStep: validation started -- %d pairs", total_pairs
+        )
         validated: dict[str, dict[str, np.ndarray]] = defaultdict(dict)
-        for st_fp, nd_map in out_match.items():
-            for nd_fp, arr in nd_map.items():
-                if arr.size == 0:
-                    continue
-                st_kpts = np.ascontiguousarray(arr[:, :2])
-                nd_kpts = np.ascontiguousarray(arr[:, 2:])
-                try:
-                    inliers = validate_kps_matches(
-                        st_kpts, nd_kpts, fp_to_size[st_fp], fp_to_size[nd_fp]
-                    )
-                except Exception:
-                    LOGGER.exception(
-                        "Mast3rFastMatchPipelineStep: not able to validate matches"
-                    )
-                    continue
-                kept = arr[inliers[:, 0]]
-                if len(kept) < self.min_pairs:
-                    continue
-                validated[st_fp][nd_fp] = kept
+        with tqdm(total=total_pairs, desc="Mast3rFastMatchPipelineStep validating") as tbar:
+            for st_fp, nd_map in out_match.items():
+                for nd_fp, arr in nd_map.items():
+                    if arr.size == 0:
+                        tbar.update(1)
+                        continue
+                    st_kpts = np.ascontiguousarray(arr[:, :2])
+                    nd_kpts = np.ascontiguousarray(arr[:, 2:])
+                    try:
+                        inliers = validate_kps_matches(
+                            st_kpts,
+                            nd_kpts,
+                            fp_to_size[st_fp],
+                            fp_to_size[nd_fp],
+                            max_error=self.validate_max_error,
+                        )
+                    except Exception:
+                        LOGGER.exception(
+                            "Mast3rFastMatchPipelineStep: not able to validate matches"
+                        )
+                        tbar.update(1)
+                        continue
+                    kept = arr[inliers[:, 0]]
+                    if len(kept) >= self.min_pairs:
+                        validated[st_fp][nd_fp] = kept
+                    tbar.update(1)
+        validated_pairs = sum(len(nd_map) for nd_map in validated.values())
+        LOGGER.info(
+            "Mast3rFastMatchPipelineStep: validation ended -- %d/%d pairs kept",
+            validated_pairs,
+            total_pairs,
+        )
         return validated
 
     def _save_matches_and_kpts(

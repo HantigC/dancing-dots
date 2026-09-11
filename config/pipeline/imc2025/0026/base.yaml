@@ -54,6 +54,7 @@ pipeline_steps:
     pixel_tol: 4
     max_iter: 1
     validate: true
+    validate_max_error: 2.0
 
 reconstruction_runner:
   create_pipeline_method: app.imc2025.pipeline.create_pipeline
