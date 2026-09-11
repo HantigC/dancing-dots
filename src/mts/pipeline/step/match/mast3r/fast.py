@@ -345,15 +345,11 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
                             original_sizes[nd_id],
                         )
 
-                    # 3. pull to host, validate, collect.
+                    # 3. pull to host, collect.
                     for slot, (st_id, nd_id) in enumerate(window):
                         if kpts_on_device[slot] is None:
                             continue
-                        st_kpts, nd_kpts = self._finalize_pair(
-                            kpts_on_device[slot],
-                            original_sizes[st_id],
-                            original_sizes[nd_id],
-                        )
+                        st_kpts, nd_kpts = self._finalize_pair(kpts_on_device[slot])
                         if len(st_kpts) < self.min_pairs:
                             continue
                         st_fp = str(image_repository.get_filepath(st_id))
@@ -368,6 +364,11 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
         for device in self._devices:
             if device.type == "cuda":
                 torch.cuda.synchronize(device)
+
+        if self.validate:
+            out_match = self._validate_matches(
+                image_repository, out_match, original_sizes
+            )
 
         return merge_matches(out_match)
 
@@ -406,6 +407,7 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
                 subsample=self.subsample,
                 pixel_tol=self.pixel_tol,
                 max_iter=self.max_iter,
+                size_param=self.image_size,
                 top_k=self.top_k_matches,
                 search_subsample=self.search_subsample,
             )
@@ -418,28 +420,51 @@ class Mast3rFastMatchPipelineStep(PerSceneStep):
     def _finalize_pair(
         self,
         kpts_on_device: tuple[torch.Tensor, torch.Tensor],
-        st_original_size: tuple[int, int],
-        nd_original_size: tuple[int, int],
     ) -> tuple[np.ndarray, np.ndarray]:
         st_kpts = to_numpy(kpts_on_device[0])
         nd_kpts = to_numpy(kpts_on_device[1])
         if st_kpts.size == 0:
             return np.empty((0, 2), np.float32), np.empty((0, 2), np.float32)
 
-        if self.validate:
-            try:
-                inliers = validate_kps_matches(
-                    st_kpts, nd_kpts, st_original_size, nd_original_size
-                )
-            except Exception:
-                LOGGER.exception(
-                    "Mast3rFastMatchPipelineStep: not able to validate matches"
-                )
-                return np.empty((0, 2), np.float32), np.empty((0, 2), np.float32)
-            st_kpts = st_kpts[inliers[:, 0]]
-            nd_kpts = nd_kpts[inliers[:, 1]]
-
         return st_kpts, nd_kpts
+
+    def _validate_matches(
+        self,
+        image_repository: BaseImageRepository,
+        out_match: dict[str, dict[str, np.ndarray]],
+        original_sizes: dict[ImageId, tuple[int, int]],
+    ) -> dict[str, dict[str, np.ndarray]]:
+        """Geometry-verify every raw pair's matches before they are merged.
+
+        ``out_match`` maps ``st_fp -> nd_fp -> (M, 4)`` arrays of paired
+        ``[st_xy | nd_xy]`` coordinates; each pair is RANSAC-filtered and pairs
+        left below ``min_pairs`` are dropped.
+        """
+        fp_to_size = {
+            str(image_repository.get_filepath(image_id)): size
+            for image_id, size in original_sizes.items()
+        }
+        validated: dict[str, dict[str, np.ndarray]] = defaultdict(dict)
+        for st_fp, nd_map in out_match.items():
+            for nd_fp, arr in nd_map.items():
+                if arr.size == 0:
+                    continue
+                st_kpts = np.ascontiguousarray(arr[:, :2])
+                nd_kpts = np.ascontiguousarray(arr[:, 2:])
+                try:
+                    inliers = validate_kps_matches(
+                        st_kpts, nd_kpts, fp_to_size[st_fp], fp_to_size[nd_fp]
+                    )
+                except Exception:
+                    LOGGER.exception(
+                        "Mast3rFastMatchPipelineStep: not able to validate matches"
+                    )
+                    continue
+                kept = arr[inliers[:, 0]]
+                if len(kept) < self.min_pairs:
+                    continue
+                validated[st_fp][nd_fp] = kept
+        return validated
 
     def _save_matches_and_kpts(
         self,
