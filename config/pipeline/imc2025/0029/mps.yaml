@@ -1,0 +1,9 @@
+pipeline_steps:
+  embedder:
+    device: mps
+
+  kp_matching:
+    device: mps
+
+  refine_matching:
+    device: mps
