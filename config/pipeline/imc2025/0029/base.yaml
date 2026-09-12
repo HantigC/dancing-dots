@@ -58,30 +58,10 @@ pipeline_steps:
       max_iter: 3
       validate: false
 
-  refine_matching:
-    _target_: mts.pipeline.step.base.OnDeviceRunner
-    device: cuda:0
-    step:
-      _target_: mts.pipeline.step.match.mast3r.refine.Mast3rRefineMatchPipelineStep.from_checkpoint
-      mast3r_model_checkpoint: 'model-weights/mast3r/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth'
-      source_keypoints_name: mast3r
-      source_matches_name: mast3r
-      target_keypoints_name: mast3r_refined
-      target_matches_name: mast3r_refined
-      min_pairs: 15
-      max_image_size: 1024
-      pixel_tol: 5
-      subsample: 8
-      max_batch_size: 48
-      overlap: 0.5
-      conf_thr: null
-      bucket_size: 1
-      round_digits: 1
-
   reconstruction:
     _target_: mts.pipeline.step.reconstruct.colmap.incremental.ColmapReconstructionStep
-    keypoints_name: mast3r_refined
-    matches_name: mast3r_refined
+    keypoints_name: mast3r
+    matches_name: mast3r
     mapper_options:
       _target_: mts.helpers.colmap.options.create_incremental_pipeline_options
       min_model_size: 3
