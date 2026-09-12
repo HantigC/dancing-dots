@@ -1,0 +1,9 @@
+
+tag: NetVlad(cross-looser)+Mast3r+fast-singlegpu+fine-refine
+pipeline_steps:
+  pairing:
+    cutoff_th: 1.0
+    distance_th: 20
+    min_pairs: 40
+    max_pairs_per_image: 80
+    max_pairs: 10000
