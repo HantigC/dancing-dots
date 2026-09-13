@@ -66,6 +66,7 @@ class Mast3rFastSingleMatchPipelineStep(PerSceneStep):
         subsample: int = 16,
         pixel_tol: int = 0,
         max_iter: int = 1,
+        bucket_size: int = 1,
         top_k_matches: int | None = None,
         validate: bool = True,
         validate_max_error: float = 2.0,
@@ -83,6 +84,7 @@ class Mast3rFastSingleMatchPipelineStep(PerSceneStep):
         self.pixel_tol = pixel_tol
         self.max_iter = max_iter
         self.top_k_matches = top_k_matches
+        self.bucket_size = bucket_size
         self.validate = validate
         self.validate_max_error = validate_max_error
         self.search_subsample = search_subsample
@@ -235,7 +237,7 @@ class Mast3rFastSingleMatchPipelineStep(PerSceneStep):
                 image_repository, out_match, original_sizes
             )
 
-        return merge_matches(out_match)
+        return merge_matches(out_match, bucket_size=self.bucket_size)
 
     def _decode_pair(
         self,

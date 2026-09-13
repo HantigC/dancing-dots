@@ -86,7 +86,7 @@ class cdistMatcher:
     def query(self, queries, k=1, **kw):
         assert k == 1
         if queries.numel() == 0:
-            return None, []
+            return None, torch.empty(0, device=self.device, dtype=torch.bool,)
         nnA, nnB = bruteforce_reciprocal_nns(
             queries, self.db_pts, device=self.device, **kw
         )
@@ -215,6 +215,8 @@ def fast_reciprocal_NNs(
     niter = 0
     while notyet.any():
         _, xy2_upd = tree2.query(pts1[xy1[notyet]], **matcher_kw)
+        if len(xy2_upd) == 0:
+            break
         if indices2 is not None:
             xy2_upd = indices2[xy2_upd]
         xy2[notyet] = xy2_upd
@@ -222,6 +224,9 @@ def fast_reciprocal_NNs(
             notyet &= old_xy2 != xy2  # remove points that have converged
 
         _, xy1_upd = tree1.query(pts2[xy2[notyet]], **matcher_kw)
+
+        if len(xy1_upd) == 0:
+            break
         if indices1 is not None:
             xy1_upd = indices1[xy1_upd]
         xy1[notyet] = xy1_upd
