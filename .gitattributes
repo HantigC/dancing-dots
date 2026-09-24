@@ -1,2 +1,2 @@
 runs filter=lfs diff=lfs merge=lfs -text
-iterations/0426 filter=lfs diff=lfs merge=lfs -text
+iterations/0426/** filter=lfs diff=lfs merge=lfs -text

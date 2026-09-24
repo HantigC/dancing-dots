@@ -1,7 +1,14 @@
 # Project
 data/
-iterations/
+iterations/*
 weights/
+*.bin
+*.h5
+*.db
+model-weights/
+h5_repositories/
+ipynbs/ch5/
+kaggle-iterations/
 
 # vscode
 .vscode/
@@ -213,3 +220,5 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+!iterations/0426/
+!iterations/0426/**
